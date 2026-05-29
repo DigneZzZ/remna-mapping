@@ -17,112 +17,163 @@
     --up:#22d3ee; --down:#ff6b81; --warn:#e3b341; --err:#ff6b81; --info:#8b949e;
     --acc:#06b6d4; --acc2:#0d9488; --acc-hi:#22d3ee;
     --dom:#06b6d4; --inb:#a78bfa; --host:#22d3ee; --foreign:#f0883e; --disabled:#6e7681;
-    --rad:8px; --rad-lg:12px; --rad-sm:6px;
-    --shadow:0 8px 30px rgba(1,4,9,.55);
+    /* Mantine dark scale (theme.ts colors.dark[4..7]) used for borders & surfaces */
+    --dark4:#484f58; --dark5:#30363d; --dark6:#21262d; --dark7:#161b22;
+    /* Radius — Mantine defaultRadius:'md' = 8px; sm = 4px; lg = 16px (Mantine defaults) */
+    --rad:8px; --rad-sm:4px; --rad-lg:16px;
+    /* Borders — subtle white-alpha hairlines like Mantine dark surfaces (modal/fieldset overrides) */
+    --bd:rgba(255,255,255,.08); --bd-strong:#30363d; --bd-soft:rgba(255,255,255,.06);
+    /* Elevation — Mantine default shadows (sm/md/lg) + menu dropdown shadow (overrides/menu.ts) */
+    --shadow-xs:0 1px 3px rgba(0,0,0,.05),0 1px 2px rgba(0,0,0,.1);
+    --shadow-sm:0 1px 3px rgba(0,0,0,.05),rgba(0,0,0,.05) 0 10px 15px -5px,rgba(0,0,0,.04) 0 7px 7px -5px;
+    --shadow-md:0 1px 3px rgba(0,0,0,.05),rgba(0,0,0,.05) 0 20px 25px -5px,rgba(0,0,0,.04) 0 10px 10px -5px;
+    --shadow-lg:0 1px 3px rgba(0,0,0,.05),rgba(0,0,0,.05) 0 28px 23px -7px,rgba(0,0,0,.04) 0 12px 12px -7px;
+    --shadow:0 8px 32px rgba(0,0,0,.4),0 2px 8px rgba(0,0,0,.2);
+    /* Spacing — Mantine spacing scale (xs/sm/md/lg/xl) */
+    --sp-xs:10px; --sp-sm:12px; --sp-md:16px; --sp-lg:20px; --sp-xl:32px;
+    /* Mantine control sizing: size sm = 36px height; inputs padding-y 6px, button padding-x 18px */
+    --ctrl-h:36px;
+    /* Focus ring — theme.ts focusRing:'never' → focus shown via accent border, no big outer glow */
+    --focus:rgba(6,182,212,.55);
+    /* Card surface gradient (overrides/card.module.css: dark-6 → dark-7) */
+    --card-grad:linear-gradient(135deg,var(--dark6) 0%,var(--dark7) 100%);
+    /* Standard transition (overrides/buttons.tsx Button styles.root) */
+    --tr:all .2s ease;
   }
   *{box-sizing:border-box}
   html,body{margin:0;height:100%}
   body{font-family:Montserrat,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
     background:radial-gradient(1200px 800px at 70% -10%,#161b22 0%,var(--bg1) 42%,var(--bg0) 100%);
     color:var(--txt);height:100vh;overflow:hidden;display:flex;flex-direction:column}
-  .bar{display:flex;align-items:center;gap:10px;padding:11px 16px;border-bottom:1px solid var(--cardb);
+  .bar{display:flex;align-items:center;gap:var(--sp-xs);padding:var(--sp-sm) var(--sp-md);border-bottom:1px solid var(--bd);
        background:rgba(13,17,23,.78);backdrop-filter:blur(10px);flex-wrap:wrap;z-index:6}
   .logo{font-weight:600;font-size:15px;display:flex;align-items:center;gap:9px;white-space:nowrap;letter-spacing:.2px}
   .logo .dot{width:10px;height:10px;border-radius:50%;background:linear-gradient(135deg,var(--acc2),var(--acc-hi));box-shadow:0 0 12px var(--acc)}
-  .bar input[type=text],.bar input[type=password]{background:rgba(255,255,255,.04);border:1px solid var(--cardb);
-    color:var(--txt);border-radius:var(--rad);padding:8px 11px;font-size:13px;outline:none;transition:.15s}
-  .bar input:focus{border-color:var(--acc);box-shadow:0 0 0 2px rgba(6,182,212,.22)}
+  /* Mantine input: height 36px (size sm), padding-y 6px, border 1px solid, radius md.
+     focusRing:'never' → no outer glow, just an accent border on focus (overrides/inputs.ts). */
+  .bar input[type=text],.bar input[type=password]{background:rgba(255,255,255,.04);border:1px solid var(--bd);
+    color:var(--txt);border-radius:var(--rad);height:var(--ctrl-h);padding:6px 12px;font-size:14px;outline:none;transition:border-color .15s ease,box-shadow .15s ease}
+  .bar input::placeholder{color:var(--faint)}
+  .bar input:hover{border-color:var(--bd-strong)}
+  .bar input:focus{border-color:var(--acc);box-shadow:0 0 0 1px var(--acc)}
   #panelUrl{width:200px} #token{width:200px;flex:1;min-width:150px}
-  .btn{background:linear-gradient(135deg,var(--acc2) 0%,var(--acc) 100%);border:none;color:#fff;font-weight:600;
-       border-radius:var(--rad);padding:9px 15px;font-size:13px;cursor:pointer;white-space:nowrap;transition:all .2s ease}
-  .btn:hover{background:linear-gradient(135deg,#14b8a6 0%,var(--acc-hi) 100%);box-shadow:0 4px 16px rgba(6,182,212,.32)}
-  .btn:disabled{opacity:.5;cursor:default;box-shadow:none}
-  .btn.ghost{background:rgba(255,255,255,.05);border:1px solid var(--cardb);color:var(--txt);box-shadow:none}
-  .btn.ghost:hover{background:rgba(6,182,212,.1);border-color:rgba(6,182,212,.4);box-shadow:none}
-  .switch{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--mut);user-select:none}
-  .switch input{width:34px;height:18px;appearance:none;background:#30363d;border-radius:20px;position:relative;cursor:pointer;transition:.2s}
-  .switch input:checked{background:linear-gradient(135deg,var(--acc2),var(--acc))}
-  .switch input::after{content:"";position:absolute;width:14px;height:14px;border-radius:50%;background:#fff;top:2px;left:2px;transition:.2s}
-  .switch input:checked::after{left:18px}
+  /* Mantine Button: height 36px (size sm), padding-x 18px, font-size 14px, font-weight 500 (medium),
+     radius md, transition all .2s ease (overrides/buttons.tsx). Filled accent for the primary CTA. */
+  .btn{background:var(--acc);border:1px solid transparent;color:#06222a;font-weight:500;line-height:1;
+       border-radius:var(--rad);height:var(--ctrl-h);padding:0 18px;font-size:14px;cursor:pointer;white-space:nowrap;
+       display:inline-flex;align-items:center;justify-content:center;gap:7px;transition:var(--tr)}
+  .btn:hover{background:var(--acc-hi)}
+  .btn:active{transform:translateY(1px)}
+  .btn:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+  .btn:disabled{opacity:.45;cursor:default;transform:none}
+  /* Mantine variant:'light' — translucent accent tint, colored text, no solid border, soft hover. */
+  .btn.ghost{background:rgba(6,182,212,.08);border:1px solid transparent;color:var(--acc-hi);font-weight:500}
+  .btn.ghost:hover{background:rgba(6,182,212,.15)}
+  .switch{display:flex;align-items:center;gap:7px;font-size:13px;color:var(--mut);user-select:none}
+  /* Mantine Switch (radius:'md'): track 36×20, thumb 16, accent gradient when checked, .15s ease. */
+  .switch input{width:36px;height:20px;appearance:none;background:var(--dark5);border:1px solid var(--bd);border-radius:var(--rad);position:relative;cursor:pointer;transition:background .15s ease,border-color .15s ease}
+  .switch input:checked{background:var(--acc);border-color:var(--acc)}
+  .switch input::after{content:"";position:absolute;width:14px;height:14px;border-radius:calc(var(--rad) - 3px);background:#fff;top:2px;left:2px;transition:left .15s ease;box-shadow:0 1px 2px rgba(0,0,0,.3)}
+  .switch input:checked::after{left:19px}
+  .switch input:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
   .meta{font-size:11px;color:var(--mut);margin-left:auto;text-align:right;line-height:1.45}
-  .privacy{font-size:11.5px;color:#9fbcc8;background:rgba(6,182,212,.06);border-bottom:1px solid var(--cardb);padding:7px 16px;line-height:1.4}
+  .privacy{font-size:11.5px;color:#9fbcc8;background:rgba(6,182,212,.06);border-bottom:1px solid var(--bd);padding:8px var(--sp-md);line-height:1.4}
   .privacy b{color:#c9d1d9;font-weight:600}
   .privacy a{color:var(--acc-hi);text-decoration:none;border-bottom:1px solid rgba(34,211,238,.4)}
   .privacy a:hover{color:#7ce9f7;border-bottom-color:#7ce9f7}
-  .stats{display:flex;gap:9px;padding:10px 16px;flex-wrap:wrap;border-bottom:1px solid var(--cardb);background:rgba(13,17,23,.4)}
-  .stat{background:linear-gradient(135deg,#21262d 0%,#161b22 100%);border:1px solid var(--cardb);border-radius:var(--rad-lg);padding:7px 13px;min-width:90px}
+  .stats{display:flex;gap:var(--sp-sm);padding:var(--sp-sm) var(--sp-md);flex-wrap:wrap;border-bottom:1px solid var(--bd);background:rgba(13,17,23,.4)}
+  /* Mantine Card: gradient dark-6→dark-7, withBorder hairline, radius md, soft elevation (overrides/card). */
+  .stat{background:var(--card-grad);border:1px solid var(--bd);border-radius:var(--rad);padding:10px 14px;min-width:90px;box-shadow:var(--shadow-xs)}
   .stat .v{font-size:18px;font-weight:600;line-height:1.1}
   .stat .v small{font-size:12px;color:var(--mut);font-weight:600}
-  .stat .l{font-size:10px;color:var(--mut);text-transform:uppercase;letter-spacing:.5px;margin-top:3px}
-  .chip{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;padding:2px 7px;border-radius:20px;margin-right:4px}
-  .chip.e{background:rgba(255,107,129,.15);color:var(--err)} .chip.w{background:rgba(227,179,65,.16);color:var(--warn)} .chip.i{background:rgba(139,148,158,.16);color:var(--info)}
+  .stat .l{font-size:10px;color:var(--mut);text-transform:uppercase;letter-spacing:.5px;margin-top:4px}
+  /* Mantine Badge: radius md, outline variant (1px hairline + tinted text), compact padding. */
+  .chip{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;padding:2px 8px;border-radius:var(--rad);border:1px solid transparent;margin-right:4px;line-height:1.5}
+  .chip.e{background:rgba(255,107,129,.12);border-color:rgba(255,107,129,.35);color:var(--err)} .chip.w{background:rgba(227,179,65,.12);border-color:rgba(227,179,65,.35);color:var(--warn)} .chip.i{background:rgba(139,148,158,.12);border-color:rgba(139,148,158,.3);color:var(--info)}
 
-  .toolbar{display:flex;align-items:center;gap:10px;padding:9px 16px;border-bottom:1px solid var(--cardb);
+  .toolbar{display:flex;align-items:center;gap:var(--sp-xs);padding:var(--sp-sm) var(--sp-md);border-bottom:1px solid var(--bd);
            background:rgba(13,17,23,.55);flex-wrap:wrap;z-index:5}
-  .views{display:flex;gap:4px;background:rgba(255,255,255,.03);border:1px solid var(--cardb);border-radius:var(--rad);padding:3px}
-  .views button{background:transparent;border:none;color:var(--mut);font-size:12.5px;font-weight:600;
-                padding:6px 12px;border-radius:var(--rad-sm);cursor:pointer;display:flex;align-items:center;gap:6px;transition:.15s}
-  .views button:hover{color:var(--txt)}
-  .views button.on{background:linear-gradient(135deg,rgba(13,148,136,.22),rgba(6,182,212,.18));color:#aef0fa}
-  .toolbar select,.toolbar input[type=text]{background:rgba(255,255,255,.04);border:1px solid var(--cardb);
-    color:var(--txt);border-radius:var(--rad);padding:7px 10px;font-size:12.5px;outline:none;transition:.15s}
-  .toolbar select:focus,.toolbar input:focus{border-color:var(--acc);box-shadow:0 0 0 2px rgba(6,182,212,.18)}
+  /* Mantine SegmentedControl: rounded track (radius md) with inner padding; the active segment
+     gets a raised control surface (dark-6 + hairline + small shadow), inactive is muted. */
+  .views{display:flex;gap:2px;background:rgba(255,255,255,.03);border:1px solid var(--bd);border-radius:var(--rad);padding:4px}
+  .views button{background:transparent;border:none;color:var(--mut);font-size:13px;font-weight:500;
+                padding:6px 14px;border-radius:calc(var(--rad) - 2px);cursor:pointer;display:flex;align-items:center;gap:6px;transition:var(--tr)}
+  .views button:hover{color:var(--txt);background:rgba(255,255,255,.04)}
+  .views button.on{background:var(--dark6);border:1px solid var(--bd);color:#aef0fa;box-shadow:var(--shadow-xs);font-weight:600}
+  /* Mantine input/select: 36px control, radius md, accent border on focus (no outer ring). */
+  .toolbar select,.toolbar input[type=text]{background:rgba(255,255,255,.04);border:1px solid var(--bd);
+    color:var(--txt);border-radius:var(--rad);height:var(--ctrl-h);padding:6px 12px;font-size:13px;outline:none;transition:border-color .15s ease,box-shadow .15s ease}
+  .toolbar select:hover,.toolbar input:hover{border-color:var(--bd-strong)}
+  .toolbar select:focus,.toolbar input:focus{border-color:var(--acc);box-shadow:0 0 0 1px var(--acc)}
   select option,select optgroup{background:#161b22;color:#c9d1d9}
   #search{width:170px}
 
   .wrap{flex:1;display:flex;min-height:0}
   #viewport{flex:1;position:relative;overflow:hidden}
-  #viewport svg{width:100%;height:100%;display:block}
+  #viewport > svg{width:100%;height:100%;display:block}   /* only the D3 graph svg, NOT nested legend icons */
+  .ic svg{display:block;width:13px;height:13px;flex:0 0 auto}   /* base size for entity icons (overridden per context below) */
   .vp-svg{cursor:grab} .vp-svg:active{cursor:grabbing}
-  .legend{position:absolute;left:14px;bottom:12px;background:rgba(13,17,23,.7);border:1px solid var(--cardb);
-          border-radius:var(--rad);padding:9px 11px;font-size:11px;color:var(--mut);backdrop-filter:blur(6px);pointer-events:none;max-width:60%}
+  /* Mantine Paper/Card floating surface: radius md, hairline, soft elevation. */
+  .legend{position:absolute;left:14px;bottom:12px;background:rgba(13,17,23,.7);border:1px solid var(--bd);
+          border-radius:var(--rad);padding:10px 12px;font-size:11px;color:var(--mut);backdrop-filter:blur(6px);pointer-events:none;max-width:60%;box-shadow:var(--shadow-sm)}
   .legend div{display:inline-flex;align-items:center;gap:6px;margin:2px 9px 2px 0}
   .legend i{width:10px;height:10px;border-radius:50%;display:inline-block}
   .legend .ic svg{display:block;width:13px;height:13px}
   .hint{position:absolute;right:14px;bottom:12px;font-size:11px;color:var(--faint);pointer-events:none}
 
-  .side{width:360px;border-left:1px solid var(--cardb);display:flex;flex-direction:column;background:rgba(13,17,23,.6);backdrop-filter:blur(8px)}
-  .tabs{display:flex;border-bottom:1px solid var(--cardb)}
-  .tab{flex:1;text-align:center;padding:10px;font-size:12.5px;font-weight:600;color:var(--mut);cursor:pointer;border-bottom:2px solid transparent;transition:.15s}
-  .tab:hover{color:var(--txt)}
-  .tab.active{color:var(--txt);border-bottom-color:var(--acc)}
-  .panel{flex:1;overflow:auto;padding:12px 14px}
-  .panel::-webkit-scrollbar{width:8px}.panel::-webkit-scrollbar-thumb{background:linear-gradient(180deg,var(--acc2),var(--acc));border-radius:8px;border:1px solid rgba(22,27,35,.8)}
-  .issue{border:1px solid var(--cardb);border-radius:var(--rad-lg);padding:9px 11px;margin-bottom:8px;cursor:pointer;transition:.12s;background:var(--card)}
-  .issue:hover{border-color:rgba(6,182,212,.45);background:rgba(6,182,212,.05)} .issue.e{border-left:3px solid var(--err)} .issue.w{border-left:3px solid var(--warn)} .issue.i{border-left:3px solid var(--info)}
+  .side{width:360px;border-left:1px solid var(--bd);display:flex;flex-direction:column;background:rgba(13,17,23,.6);backdrop-filter:blur(8px)}
+  /* Mantine Tabs (default variant): bottom-border indicator, muted→text on hover, accent on active. */
+  .tabs{display:flex;border-bottom:1px solid var(--bd)}
+  .tab{flex:1;text-align:center;padding:11px;font-size:13px;font-weight:500;color:var(--mut);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;transition:var(--tr)}
+  .tab:hover{color:var(--txt);background:rgba(255,255,255,.03)}
+  .tab.active{color:var(--acc-hi);border-bottom-color:var(--acc);font-weight:600}
+  .panel{flex:1;overflow:auto;padding:var(--sp-sm) var(--sp-md)}
+  /* Scrollbar — matches global.css: width 8px, radius 4px, teal→cyan gradient thumb. */
+  .panel::-webkit-scrollbar{width:8px}.panel::-webkit-scrollbar-thumb{background:linear-gradient(180deg,var(--acc2),var(--acc));border-radius:4px;border:1px solid rgba(22,27,35,.8)}
+  /* Mantine Card row: radius md, hairline, gradient surface, soft hover-lift. */
+  .issue{border:1px solid var(--bd);border-radius:var(--rad);padding:10px 12px;margin-bottom:var(--sp-xs);cursor:pointer;transition:var(--tr);background:var(--card-grad)}
+  .issue:hover{border-color:rgba(6,182,212,.45);box-shadow:var(--shadow-xs)} .issue.e{border-left:3px solid var(--err)} .issue.w{border-left:3px solid var(--warn)} .issue.i{border-left:3px solid var(--info)}
   .issue .t{font-size:11px;font-weight:700;letter-spacing:.4px;display:flex;align-items:center;gap:6px}
   .issue .t .ic svg{display:block;width:13px;height:13px}
   .issue .m{font-size:12px;color:var(--mut);margin-top:4px;line-height:1.45;word-break:break-word}
   .sev-dot{width:8px;height:8px;border-radius:50%}
-  .filterrow{display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap}
-  .filterrow button{font-size:11px;padding:5px 9px;border-radius:var(--rad);border:1px solid var(--cardb);background:var(--card);color:var(--mut);cursor:pointer;transition:.12s}
-  .filterrow button.on{color:var(--txt);border-color:rgba(6,182,212,.45);background:rgba(6,182,212,.12)}
+  .filterrow{display:flex;gap:6px;margin-bottom:var(--sp-xs);flex-wrap:wrap}
+  /* Mantine outline Badge / chip toggle: radius md, 1px hairline, tinted accent when on. */
+  .filterrow button{font-size:11px;font-weight:500;padding:5px 10px;border-radius:var(--rad);border:1px solid var(--bd);background:rgba(255,255,255,.03);color:var(--mut);cursor:pointer;transition:var(--tr)}
+  .filterrow button:hover{border-color:var(--bd-strong);color:var(--txt)}
+  .filterrow button.on{color:var(--acc-hi);border-color:rgba(6,182,212,.45);background:rgba(6,182,212,.12)}
   .kv{display:flex;justify-content:space-between;gap:10px;font-size:12.5px;padding:5px 0;border-bottom:1px dashed rgba(255,255,255,.06)}
   .kv span:first-child{color:var(--mut)} .kv span:last-child{text-align:right;word-break:break-word}
   .det-title{font-size:15px;font-weight:600;margin:2px 0 10px;display:flex;align-items:center;gap:8px}
   .det-title .ic svg{display:block;width:17px;height:17px;flex:0 0 auto}
-  .badge{font-size:10px;font-weight:700;padding:2px 7px;border-radius:var(--rad-sm)}
-  .badge.up{background:rgba(34,211,238,.15);color:var(--up)} .badge.down{background:rgba(255,107,129,.16);color:var(--down)} .badge.dis{background:rgba(110,118,129,.2);color:var(--disabled)}
+  /* Mantine Badge (radius md, outline-style): hairline border + tinted fill. */
+  .badge{font-size:10px;font-weight:700;padding:2px 8px;border-radius:var(--rad);border:1px solid transparent;line-height:1.6}
+  .badge.up{background:rgba(34,211,238,.12);border-color:rgba(34,211,238,.35);color:var(--up)} .badge.down{background:rgba(255,107,129,.12);border-color:rgba(255,107,129,.35);color:var(--down)} .badge.dis{background:rgba(110,118,129,.16);border-color:rgba(110,118,129,.3);color:var(--disabled)}
   .empty{color:var(--faint);font-size:12.5px;text-align:center;margin-top:40px;line-height:1.6}
-  .pillist{display:flex;flex-wrap:wrap;gap:5px;margin-top:5px}
-  .pill{font-size:11px;background:rgba(255,255,255,.05);border:1px solid var(--cardb);border-radius:20px;padding:2px 9px}
-  .tooltip{position:absolute;pointer-events:none;background:rgba(13,17,23,.97);border:1px solid var(--cardb);
+  .pillist{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+  /* Mantine outline Badge: radius md, hairline border, subtle surface. */
+  .pill{font-size:11px;background:rgba(255,255,255,.03);border:1px solid var(--bd);border-radius:var(--rad);padding:3px 10px}
+  /* Mantine Tooltip override: radius md, dark.6 surface, 1px dark-4 border (overrides/tooltip.ts). */
+  .tooltip{position:absolute;pointer-events:none;background:var(--dark6);border:1px solid var(--dark4);
            border-radius:var(--rad);padding:8px 11px;font-size:12px;max-width:300px;opacity:0;transition:opacity .12s;z-index:30;box-shadow:var(--shadow)}
   .tooltip b{color:#fff} .tooltip .s{color:var(--mut);font-size:11px}
   .tooltip .ic svg{width:13px;height:13px;vertical-align:-2px;margin-right:4px}
   .cp{cursor:pointer;opacity:.5;margin-left:6px;font-size:11px;user-select:none}
   .cp:hover{opacity:1;color:var(--acc-hi)}
-  .toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:rgba(22,27,35,.97);border:1px solid var(--cardb);color:var(--txt);padding:8px 14px;border-radius:var(--rad);font-size:12.5px;opacity:0;pointer-events:none;transition:opacity .2s;z-index:70;box-shadow:var(--shadow);max-width:80vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  /* Mantine Notification-style toast: radius md, dark surface, menu-dropdown shadow. */
+  .toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--dark6);border:1px solid var(--bd);color:var(--txt);padding:9px 14px;border-radius:var(--rad);font-size:12.5px;opacity:0;pointer-events:none;transition:opacity .2s;z-index:70;box-shadow:var(--shadow);max-width:80vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .toast.show{opacity:1}
   .modal-bg{position:fixed;inset:0;background:rgba(1,4,9,.7);display:none;align-items:center;justify-content:center;z-index:50}
   .modal-bg.show{display:flex}
-  .modal{background:linear-gradient(135deg,#161b22 0%,#0d1117 100%);border:1px solid rgba(255,255,255,.08);border-radius:var(--rad-lg);max-width:560px;width:90%;max-height:84vh;overflow:auto;padding:16px 20px;box-shadow:0 20px 60px rgba(1,4,9,.7);position:relative}
-  .modal .x{position:absolute;right:14px;top:12px;cursor:pointer;color:var(--mut);font-size:11px;border:1px solid var(--cardb);border-radius:var(--rad-sm);padding:3px 9px;transition:.12s}
-  .modal .x:hover{color:var(--txt);border-color:rgba(6,182,212,.45)}
-  .chain-sec{margin-top:14px} .chain-sec h4{font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:.6px;margin:0 0 7px;font-weight:700}
-  .chain-row{padding:6px 9px;border:1px solid var(--cardb);border-radius:var(--rad);margin-bottom:6px;font-size:12.5px;background:var(--card)}
+  /* Mantine Modal override: radius md, content border rgba(255,255,255,.08), header padding sm/lg,
+     gradient card surface, lg elevation (overrides/modal/modal.module.css). */
+  .modal{background:var(--card-grad);border:1px solid var(--bd);border-radius:var(--rad);max-width:560px;width:90%;max-height:84vh;overflow:auto;padding:var(--sp-md) var(--sp-lg);box-shadow:var(--shadow-lg);position:relative}
+  .modal .x{position:absolute;right:14px;top:12px;cursor:pointer;color:var(--mut);font-size:11px;border:1px solid var(--bd);border-radius:var(--rad);padding:4px 10px;transition:var(--tr)}
+  .modal .x:hover{color:var(--txt);border-color:rgba(6,182,212,.45);background:rgba(6,182,212,.08)}
+  .chain-sec{margin-top:var(--sp-md)} .chain-sec h4{font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:.6px;margin:0 0 8px;font-weight:700}
+  .chain-row{padding:7px 10px;border:1px solid var(--bd);border-radius:var(--rad);margin-bottom:6px;font-size:12.5px;background:rgba(255,255,255,.02)}
   .chain-row b{color:var(--acc-hi)} .chain-row .s{color:var(--mut);font-size:11.5px}
-  .err-banner{background:rgba(255,107,129,.13);border:1px solid rgba(255,107,129,.4);color:#ffccd3;padding:10px 14px;margin:10px 16px;border-radius:var(--rad);font-size:13px;display:none}
+  .err-banner{background:rgba(255,107,129,.12);border:1px solid rgba(255,107,129,.35);color:#ffccd3;padding:10px 14px;margin:var(--sp-xs) var(--sp-md);border-radius:var(--rad);font-size:13px;display:none}
   .spinner{width:15px;height:15px;border:2px solid rgba(255,255,255,.25);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;display:inline-block;vertical-align:-2px}
   @keyframes spin{to{transform:rotate(360deg)}}
   .pulse-s{animation:pls 1.7s ease-in-out infinite}@keyframes pls{0%,100%{opacity:1}50%{opacity:.35}}
