@@ -183,6 +183,7 @@ function saveCreds(){ if(!els.remember.checked){localStorage.removeItem('vtm');r
   localStorage.setItem('vtm',JSON.stringify({panelUrl:els.panelUrl.value.trim(),token:els.token.value.trim(),
     auto:els.autoTgl.checked,interval:els.interval.value,remember:true,view:viewMode}));}
 const fmt=n=>n==null?'—':n.toLocaleString('en-US');
+const fmtBytes=n=>{n=Number(n)||0;if(n<1024)return Math.round(n)+' B';const u=['KB','MB','GB','TB','PB'];let i=-1;do{n/=1024;i++;}while(n>=1024&&i<u.length-1);return (n<10?n.toFixed(2):n.toFixed(1))+' '+u[i];};
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const short=d=>{const s=String(d);return /^(\d{1,3}\.){3}\d{1,3}$/.test(s)?s:s.split('.')[0];};
 const flag=c=>{if(!c||c.length!==2)return '';try{return String.fromCodePoint(...[...c.toUpperCase()].map(ch=>127397+ch.charCodeAt(0)));}catch(e){return '';}};
@@ -267,6 +268,8 @@ function renderStats(){
    <div class="stat"><div class="v" style="color:var(--disabled)">${fmt(s.nodesDisabled)}</div><div class="l">Disabled</div></div>
    <div class="stat"><div class="v">${fmt(s.hostsTotal)}</div><div class="l">Hosts</div></div>
    <div class="stat"><div class="v">${fmt(s.domainsTotal)}</div><div class="l">Domains</div></div>
+   <div class="stat"><div class="v" style="font-size:13px;line-height:1.35">↑ ${fmtBytes(s.totalUp)}<br>↓ ${fmtBytes(s.totalDown)}</div><div class="l">Live traffic</div></div>
+   <div class="stat"><div class="v">${fmtBytes(s.totalUsedBytes)}</div><div class="l">Used (cycle)</div></div>
    <div class="stat"><div class="v" style="font-size:13px;padding-top:3px"><span class="chip e">${s.issues.error}</span><span class="chip w">${s.issues.warn}</span><span class="chip i">${s.issues.info}</span></div><div class="l">Issues</div></div>`;
 }
 function renderIssues(){
@@ -282,7 +285,8 @@ function renderIssues(){
   els.panelIssues.querySelectorAll('.issue').forEach(d=>d.onclick=()=>focusIssue(list[+d.dataset.ix]));
 }
 function focusIssue(it){ if(it.domain){filters.search=it.domain.toLowerCase();els.search.value=it.domain;renderView();}
-  else if(it.nodeName){filters.search=it.nodeName.toLowerCase();els.search.value=it.nodeName;renderView();} }
+  else if(it.nodeName){filters.search=it.nodeName.toLowerCase();els.search.value=it.nodeName;renderView();}
+  else if(it.hostRemark){filters.search=String(it.hostRemark).toLowerCase();els.search.value=it.hostRemark;renderView();} }
 function currentIssues(){let a=(DATA&&DATA.issues)||[];if(filters.overlay)a=a.filter(i=>i.type!=='FOREIGN_IP'&&i.type!=='STALE_IP_HOST');return a;}
 function dl(name,type,content){const b=new Blob([content],{type});const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),3000);}
 function exportData(){if(!DATA)return;const iss=currentIssues();
@@ -393,7 +397,7 @@ function openDetailFromTree(d){const t=d.data.type;
   else if(t==='host'&&d.data.meta)showHostDetail(d.data.meta);
   else if(t==='inbound'&&d.data.meta)showInboundDetail(d.data.meta);}
 function tipTree(e,d){const t=d.data.type;let h=`<b>${esc(d.data.full||d.data.name)}</b> <span class="s">${t}</span>`;
-  if(t==='node'&&d.data.meta){const n=d.data.meta;h+=`<br><span class="s">${(n.ips||[]).join(', ')}</span><br>${n.connected?'online':'down'} · ${fmt(n.usersOnline)} users`;}
+  if(t==='node'&&d.data.meta){const n=d.data.meta;h+=`<br><span class="s">${(n.ips||[]).join(', ')}</span><br>${n.connected?'online':'down'} · ${fmt(n.usersOnline)} users${(n.up||n.down)?` · ↑${fmtBytes(n.up)} ↓${fmtBytes(n.down)}`:''}`;}
   if(t==='inbound'&&d.data.meta)h+=`<br><span class="s">hosts ${d.data.meta.hostCount} · nodes ${d.data.meta.nodeCount}</span>`;
   showTipHtml(e,h);}
 
@@ -574,7 +578,7 @@ function showNodeDetail(n){
   const inbs=(n.serves||[]).map(u=>(MODEL.inboundByUuid.get(u)||{}).tag||String(u).slice(0,8));
   const doms=MODEL.domains.filter(d=>d.matched.has(n.uuid));
   const domHtml=doms.length?doms.map(d=>'<div class="chain-row"><b>'+esc(d.domain)+'</b> <span class="s">'+esc([...d.inboundTags].join(', '))+'</span><div class="s">via hosts: '+esc(d.hosts.join(', '))+'</div></div>').join(''):'<div class="s">No host domain currently routes to this node.</div>';
-  els.modalBody.innerHTML='<div class="det-title">'+(flag(n.country)?flag(n.country)+' ':'')+esc(n.name)+' <span class="badge '+st+'">'+(st==='up'?'online':st==='down'?'down':'disabled')+'</span></div>'+kv('Public IP(s)',((n.ips||[]).join('<br>'))||'-')+kv('Mgmt',esc(n.mgmtAddress)+':'+(n.port||''))+kv('Country',(n.country?flag(n.country)+' '+n.country:'-'))+kv('Users online',fmt(n.usersOnline))+kv('Reachable by domain',n.reachableByDomain?'yes':'no')+'<div class="chain-sec"><h4>Serves inbounds ('+inbs.length+')</h4><div class="pillist">'+(inbs.length?inbs.map(t=>'<span class="pill">'+esc(t)+'</span>').join(''):'<span class="s">none</span>')+'</div></div><div class="chain-sec"><h4>Reachable via ('+doms.length+' domains)</h4>'+domHtml+'</div>';
+  els.modalBody.innerHTML='<div class="det-title">'+(flag(n.country)?flag(n.country)+' ':'')+esc(n.name)+' <span class="badge '+st+'">'+(st==='up'?'online':st==='down'?'down':'disabled')+'</span></div>'+kv('Public IP(s)',((n.ips||[]).join('<br>'))||'-')+kv('Mgmt',esc(n.mgmtAddress)+':'+(n.port||''))+kv('Country',(n.country?flag(n.country)+' '+n.country:'-'))+kv('Users online',fmt(n.usersOnline))+kv('Live ↑ / ↓',fmtBytes(n.up)+' / '+fmtBytes(n.down))+(n.limitBytes?kv('Traffic used',fmtBytes(n.usedBytes)+' / '+fmtBytes(n.limitBytes)+' ('+Math.round((n.usedBytes||0)/n.limitBytes*100)+'%)'):kv('Traffic used',n.usedBytes!=null?fmtBytes(n.usedBytes):'—'))+kv('Reachable by domain',n.reachableByDomain?'yes':'no')+'<div class="chain-sec"><h4>Serves inbounds ('+inbs.length+')</h4><div class="pillist">'+(inbs.length?inbs.map(t=>'<span class="pill">'+esc(t)+'</span>').join(''):'<span class="s">none</span>')+'</div></div><div class="chain-sec"><h4>Reachable via ('+doms.length+' domains)</h4>'+domHtml+'</div>';
   els.modalBg.classList.add('show');
 }function showDomainDetailByName(name){const d=MODEL.domains.find(x=>x.domain===name);if(!d)return;switchTab('details');const hasDownNode=[...d.matched].some(u=>nodeDown(MODEL.nodeByUuid.get(u)));
   const a=DATA.hosts.flatMap(h=>h.addresses).find(z=>z.domain===name)||{ips:[],source:''};
@@ -584,11 +588,11 @@ function showNodeDetail(n){
    <div style="margin-top:8px;font-size:12px;color:var(--mut)">Resolved IPs</div><div class="pillist">${ipsHtml}</div>`;}
 function showHostDetail(h){switchTab('details');
   els.panelDetails.innerHTML=`<div class="det-title">🔗 ${esc(h.remark)} ${h.disabled?'<span class="badge dis">disabled</span>':''}</div>
-   ${kv('Inbound',esc(h.inboundTag||'—'))}${kv('Serving nodes',h.servingNodeUuids.length)}
+   ${kv('Inbound',esc(h.inboundTag||'—'))}${kv('Serving nodes',h.servingNodeUuids.length)}${kv('Live ↑ / ↓',fmtBytes(h.up)+' / '+fmtBytes(h.down))}
    <div style="margin-top:8px;font-size:12px;color:var(--mut)">Addresses</div>
    ${h.addresses.map(a=>`<div class="kv"><span>${a.kind}</span><span>${esc(a.domain||a.raw)}${a.kind==='domain'?` · ${a.ips.length} IP`:''}</span></div>`).join('')}`;}
 function showInboundDetail(i){switchTab('details');
-  els.panelDetails.innerHTML=`<div class="det-title">📡 ${esc(i.tag||'inbound')}</div>${kv('Type',i.type||'—')}${kv('Port',i.port||'—')}${kv('Hosts',i.hostCount)}${kv('Nodes serving',i.nodeCount)}${i.profileName?kv('Profile',esc(i.profileName)):''}`;}
+  els.panelDetails.innerHTML=`<div class="det-title">📡 ${esc(i.tag||'inbound')}</div>${kv('Type',i.type||'—')}${kv('Port',i.port||'—')}${kv('Hosts',i.hostCount)}${kv('Nodes serving',i.nodeCount)}${kv('Live ↑ / ↓',fmtBytes(i.up)+' / '+fmtBytes(i.down))}${i.profileName?kv('Profile',esc(i.profileName)):''}`;}
 function selectNode(id){selectedId=id;}
 
 function setupAuto(){if(autoTimer){clearInterval(autoTimer);autoTimer=null;}
