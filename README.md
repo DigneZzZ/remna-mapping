@@ -50,6 +50,23 @@ Zero runtime dependencies — the backend is a single `server.js`, the UI a sing
 
 ## Views & controls
 
+<table>
+  <tr>
+    <td align="center"><img src="docs/screenshots/01-tree.png" alt="Tree view" width="420"><br><sub><b>Tree</b> — collapsible inbound → host → domain → node</sub></td>
+    <td align="center"><img src="docs/screenshots/02-tiers.png" alt="Tiers view" width="420"><br><sub><b>Tiers</b> — layered columns</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/screenshots/03-sankey.png" alt="Sankey view" width="420"><br><sub><b>Sankey</b> — flow, link width = users online</sub></td>
+    <td align="center"><img src="docs/screenshots/04-matrix.png" alt="Matrix view" width="420"><br><sub><b>Matrix</b> — domain × node grid</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/screenshots/05-countries.png" alt="Countries view" width="420"><br><sub><b>Countries</b> — grouped by country</sub></td>
+    <td align="center"><img src="docs/screenshots/06-force.png" alt="Force view" width="420"><br><sub><b>Force</b> — clustered graph</sub></td>
+  </tr>
+</table>
+
+<sub>(screenshots use synthetic demo data)</sub>
+
 Pick a layout from the toolbar — each renders the same scan a different way:
 
 | View | Shows |

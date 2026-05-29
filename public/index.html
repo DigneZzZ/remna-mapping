@@ -545,8 +545,9 @@ function hint(t){const h=document.createElement('div');h.className='hint';h.text
 function glyphOn(sel,key,color,sz,dx,dy){sz=sz||16;dx=dx||0;dy=dy||0;
   sel.each(function(d){const k=typeof key==='function'?key(d):key;if(!k||!ICONS[k])return;
     const c=typeof color==='function'?color(d):color;const s=typeof sz==='function'?sz(d):sz;
+    const dv=typeof dx==='function'?dx(d):dx,ev=typeof dy==='function'?dy(d):dy;
     d3.select(this).append('svg').attr('class','node-glyph').attr('viewBox','0 0 16 16')
-      .attr('width',s).attr('height',s).attr('x',-s/2+dx).attr('y',-s/2+dy)
+      .attr('width',s).attr('height',s).attr('x',-s/2+dv).attr('y',-s/2+ev)
       .style('color',c).attr('fill','none').attr('stroke','currentColor').attr('stroke-width',1.4)
       .attr('stroke-linecap','round').attr('stroke-linejoin','round').attr('pointer-events','none')
       .html(ICONS[k]);});}
