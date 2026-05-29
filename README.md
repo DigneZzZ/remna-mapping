@@ -1,4 +1,4 @@
-# VPN Topology Mapper
+# REMNAWAVE Topology Mapper
 <img width="1426" height="951" alt="image" src="https://github.com/user-attachments/assets/e55f3afb-47d6-486c-ab32-c17434167947" />
 
 A small web service for Remnawave panels. Enter your **panel URL** and **API token**, and it:
@@ -18,7 +18,7 @@ docker compose up --build -d
 ```
 
 Then in the UI:
-1. Panel URL — e.g. `panel.granitvpn.pro` (scheme optional).
+1. Panel URL — e.g. `panel.me.pro` (scheme optional).
 2. API token — a Remnawave API-role token (Bearer).
 3. **Scan**. Toggle **Auto** for periodic refresh (15s–2m).
 
