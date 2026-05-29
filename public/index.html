@@ -773,8 +773,12 @@ function renderForce(){
   if(nodesA.length<=140||filters.uniform)glyphOn(gn,d=>d.type==='node'?(nodeDown(d.meta)?'down':'node'):d.type,colOf,d=>Math.max(13,rOf(d)*2.4));
   gn.append('text').attr('x',d=>rOf(d)+4).attr('dy',3).attr('font-size',d=>d.type==='inbound'?12:10).attr('fill','rgba(231,236,245,.8)')
     .attr('paint-order','stroke').attr('stroke','rgba(7,10,20,.82)').attr('stroke-width',2.2).text(d=>d.label).style('display',nodesA.length>140?(d=>d.type==='node'?'none':null):null);
-  const sim=d3.forceSimulation(nodesA)
-    .force('link',d3.forceLink(links).id(d=>d.id).distance(d=>d.target&&d.target.type==='node'?42:64).strength(.55))
+  // Link strength dampened by node degree (mirrors d3's default) so high-degree nodes —
+  // common in Overlay mode, where every domain links to all serving nodes — don't get
+  // over-forced and throw the layout into chaos.
+  const deg={};links.forEach(l=>{deg[l.source]=(deg[l.source]||0)+1;deg[l.target]=(deg[l.target]||0)+1;});
+  const sim=d3.forceSimulation(nodesA).velocityDecay(0.45)
+    .force('link',d3.forceLink(links).id(d=>d.id).distance(d=>d.target&&d.target.type==='node'?42:64).strength(l=>{const s=(l.source&&l.source.id)||l.source,t=(l.target&&l.target.id)||l.target;return 0.55/Math.min(deg[s]||1,deg[t]||1);}))
     .force('charge',d3.forceManyBody().strength(d=>d.type==='inbound'?-480:-90))
     .force('x',d3.forceX(d=>{const u=d.type==='inbound'?d.meta.uuid:null;const k=u?ibIndex.get(u):2;return (W*0.12)+((k%5)/4)*(W*0.76);}).strength(.05))
     .force('y',d3.forceY(H/2).strength(.05)).force('collide',d3.forceCollide().radius(d=>rOf(d)+7)).force('center',d3.forceCenter(W/2,H/2))
