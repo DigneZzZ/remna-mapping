@@ -86,7 +86,7 @@ Toolbar:
 - **Filter by inbound** and **Issues only** to narrow the graph.
 - **Overlay (Netbird)** — for panels whose nodes use private/overlay IPs (e.g. Netbird) that your domains don't resolve to: match domain → node by **shared inbound** instead of public IP, and stop flagging the public IPs as foreign. Leave **off** for normal panels with public node IPs.
 - **Uniform icons** (on by default) — fixed-size entity icons; turn **off** to scale node size by users-online.
-- **Search** domains / nodes / hosts · **Fit** resets zoom · **Export issues** downloads a CSV of issues + a JSON of the full topology.
+- **Search** matches across domains, nodes, node IPs, hosts and inbound tags in every view. By default it **highlights** hits with a gold glow and dims everything else (the full graph stays for context); a live **match counter** sits next to the box. Tick **Only matches** to switch from highlight to filter (show just the matches and their chains). · **Fit** resets zoom · **Export issues** downloads a CSV of issues + a JSON of the full topology.
 - **Auto** re-scans every 15s–2m · **Remember** stores the URL + token in this browser's `localStorage` only.
 
 The UI is responsive — on narrow screens the side panel becomes a drawer (toggle bottom-right). Drag to pan, scroll to zoom.
