@@ -79,6 +79,16 @@
   .switch input:checked::after{left:19px}
   .switch input:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
   .meta{font-size:11px;color:var(--mut);margin-left:auto;text-align:right;line-height:1.45}
+  /* Optional Cookie-header row — collapsible, revealed by the "Cookie" toggle in the bar. */
+  .bar-extra{display:none;align-items:center;gap:10px;padding:9px var(--sp-md);border-bottom:1px solid var(--bd);background:rgba(13,17,23,.55);flex-wrap:wrap}
+  .bar-extra.open{display:flex}
+  .bar-extra label{font-size:12px;color:var(--mut);font-weight:600;white-space:nowrap}
+  .bar-extra input{flex:1;min-width:220px;background:rgba(255,255,255,.04);border:1px solid var(--bd);color:var(--txt);border-radius:var(--rad);height:var(--ctrl-h);padding:6px 12px;font-size:13px;outline:none;transition:border-color .15s ease,box-shadow .15s ease}
+  .bar-extra input::placeholder{color:var(--faint)}
+  .bar-extra input:hover{border-color:var(--bd-strong)}
+  .bar-extra input:focus{border-color:var(--acc);box-shadow:0 0 0 1px var(--acc)}
+  .bar-extra .be-hint{font-size:11px;color:var(--faint);flex:1 1 100%;line-height:1.4}
+  .btn.ghost.on{background:rgba(6,182,212,.18);color:#bfeaff}
   .privacy{font-size:11.5px;color:#9fbcc8;background:rgba(6,182,212,.06);border-bottom:1px solid var(--bd);padding:8px var(--sp-md);line-height:1.4}
   .privacy b{color:#c9d1d9;font-weight:600}
   .privacy a{color:var(--acc-hi);text-decoration:none;border-bottom:1px solid rgba(34,211,238,.4)}
@@ -269,7 +279,13 @@
     <label class="switch"><input id="autoTgl" type="checkbox"/> Auto</label>
     <select id="interval" class="btn ghost" style="padding:8px"><option value="15">15s</option><option value="30" selected>30s</option><option value="60">60s</option><option value="120">2m</option></select>
     <label class="switch" title="Remember URL + token in this browser"><input id="rememberTgl" type="checkbox" checked/> Remember</label>
+    <button id="extraToggle" class="btn ghost" type="button" title="Optional Cookie header — for panels behind a proxy that also gates the API by session cookie" style="padding:8px 12px">Cookie</button>
     <div class="meta" id="meta">not scanned yet</div>
+  </div>
+  <div class="bar-extra" id="barExtra">
+    <label for="cookieHdr">Cookie header</label>
+    <input id="cookieHdr" type="text" autocomplete="off" spellcheck="false" placeholder='name=value; name2=val2   —or—   {"name":"value"}'/>
+    <span class="be-hint">Sent only to your panel alongside the token. Use when the panel API sits behind a proxy that also requires a session cookie. Leave empty for normal Bearer-token panels.</span>
   </div>
 
   <div class="privacy"><b>Local-only.</b> Your panel URL and token are kept in this browser's local storage and are sent only to your panel when you scan. Nothing is stored on any server, and no data leaves your machine except DNS lookups of host domains. <b>Open-source</b> — <a href="https://github.com/DigneZzZ/remna-mapping" target="_blank" rel="noopener noreferrer">github.com/DigneZzZ/remna-mapping</a>.</div>
@@ -319,6 +335,7 @@
 const $=s=>document.querySelector(s);
 const els={panelUrl:$('#panelUrl'),token:$('#token'),scanBtn:$('#scanBtn'),autoTgl:$('#autoTgl'),interval:$('#interval'),
   remember:$('#rememberTgl'),meta:$('#meta'),stats:$('#stats'),toolbar:$('#toolbar'),views:$('#views'),
+  cookieHdr:$('#cookieHdr'),extraToggle:$('#extraToggle'),barExtra:$('#barExtra'),
   fInbound:$('#fInbound'),fIssues:$('#fIssues'),search:$('#search'),fitBtn:$('#fitBtn'),expandBtn:$('#expandBtn'),collapseBtn:$('#collapseBtn'),fOverlay:$('#fOverlay'),fUniform:$('#fUniform'),exportBtn:$('#exportBtn'),
   err:$('#errBanner'),tooltip:$('#tooltip'),viewport:$('#viewport'),
   panelIssues:$('#panelIssues'),panelDetails:$('#panelDetails'),issueCount:$('#issueCount'),modalBg:$('#modalBg'),modalX:$('#modalX'),modalBody:$('#modalBody')};
@@ -372,10 +389,12 @@ function issueIcon(i){const t=String(i.type||'').toUpperCase();
 try{const s=JSON.parse(localStorage.getItem('vtm')||'{}');
   if(s.panelUrl)els.panelUrl.value=s.panelUrl; if(s.token)els.token.value=s.token;
   if(typeof s.auto==='boolean')els.autoTgl.checked=s.auto; if(s.interval)els.interval.value=s.interval;
-  if(typeof s.remember==='boolean')els.remember.checked=s.remember; if(s.view)viewMode=s.view;}catch(e){}
+  if(typeof s.remember==='boolean')els.remember.checked=s.remember; if(s.view)viewMode=s.view;
+  if(s.cookieHdr){els.cookieHdr.value=s.cookieHdr;els.barExtra.classList.add('open');els.extraToggle.classList.add('on');}}catch(e){}
 function saveCreds(){ if(!els.remember.checked){localStorage.removeItem('vtm');return;}
+  const c=els.cookieHdr.value.trim();
   localStorage.setItem('vtm',JSON.stringify({panelUrl:els.panelUrl.value.trim(),token:els.token.value.trim(),
-    auto:els.autoTgl.checked,interval:els.interval.value,remember:true,view:viewMode}));}
+    auto:els.autoTgl.checked,interval:els.interval.value,remember:true,view:viewMode,cookieHdr:c||undefined}));}
 const fmt=n=>n==null?'—':n.toLocaleString('en-US');
 const fmtBytes=n=>{n=Number(n)||0;if(n<1024)return Math.round(n)+' B';const u=['KB','MB','GB','TB','PB'];let i=-1;do{n/=1024;i++;}while(n>=1024&&i<u.length-1);return (n<10?n.toFixed(2):n.toFixed(1))+' '+u[i];};
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -392,6 +411,8 @@ els.fOverlay.onchange=()=>{filters.overlay=els.fOverlay.checked;if(DATA){MODEL=b
 els.fUniform.onchange=()=>{filters.uniform=els.fUniform.checked;renderView();};
 els.fUniform.checked=true;filters.uniform=true;   // always start ON (ignore any browser-restored checkbox state)
 els.exportBtn.onclick=()=>exportData();
+els.extraToggle.onclick=()=>{const open=els.barExtra.classList.toggle('open');els.extraToggle.classList.toggle('on',open);if(open)els.cookieHdr.focus();};
+els.cookieHdr.addEventListener('keydown',e=>{if(e.key==='Enter')doScan();});
 let searchT;els.search.oninput=()=>{filters.search=els.search.value.trim().toLowerCase();clearTimeout(searchT);searchT=setTimeout(renderView,250);};
 els.fitBtn.onclick=()=>renderView();
 els.expandBtn.onclick=()=>{treeExpandAll=true;renderView();};
@@ -407,10 +428,11 @@ function switchTab(n){document.querySelectorAll('.tab').forEach(t=>t.classList.t
 function syncTreeControls(){const t=(viewMode==='tree');els.expandBtn.style.display=t?'':'none';els.collapseBtn.style.display=t?'':'none';}
 
 async function doScan(){
-  const panelUrl=els.panelUrl.value.trim(),token=els.token.value.trim();
-  if(!panelUrl||!token){showErr('Enter panel URL and API token.');return;}
+  const panelUrl=els.panelUrl.value.trim(),token=els.token.value.trim(),cookieHeader=els.cookieHdr.value.trim();
+  if(!panelUrl||(!token&&!cookieHeader)){showErr('Enter panel URL and an API token (or a Cookie header).');return;}
   els.scanBtn.disabled=true;els.scanBtn.innerHTML='<span class="spinner"></span> Scanning';hideErr();saveCreds();
-  try{const r=await fetch('/api/scan',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({panelUrl,token})});
+  const reqBody={panelUrl,token}; if(cookieHeader)reqBody.cookieHeader=cookieHeader;
+  try{const r=await fetch('/api/scan',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(reqBody)});
     const j=await r.json(); if(!r.ok||j.error)throw new Error(j.error||('HTTP '+r.status));
     DATA=j;MODEL=buildModel();populateInbounds();renderStats();renderIssues();renderView();
     els.toolbar.style.display='flex';syncTreeControls();els.meta.innerHTML=`<b style="color:#e7ecf5">${esc(j.panel.replace(/^https?:\/\//,''))}</b><br>scanned ${new Date().toLocaleTimeString()}`;
@@ -476,6 +498,26 @@ function domainPasses(d){
   return true;
 }
 function filteredDomains(){return MODEL.domains.filter(domainPasses);}
+// Active nodes that SERVE a (filter-visible) inbound but that no visible host domain/IP resolves to.
+// These are legitimate, online backends — relay/bridge pools, or balancer members simply missing
+// from the host DNS (the backend already flags them NODE_NOT_IN_DNS). Every graph view derives its
+// node set from DNS-matched domain chains, so without this these nodes vanish from all of them
+// (only Countries iterates DATA.nodes). We surface them linked straight to their serving inbound.
+// Returns [{node, inboundUuids:[...]}]; respects the inbound + search filters.
+function unmatchedServingNodes(){
+  const shown=new Set(); filteredDomains().forEach(d=>d.matched.forEach(u=>shown.add(u)));
+  const inbOk=u=>filters.inbound==='all'||u===filters.inbound;
+  const out=[];
+  DATA.nodes.forEach(n=>{
+    if(shown.has(n.uuid))return;                                    // already drawn via a domain
+    const inbs=(n.serves||[]).filter(u=>MODEL.inboundByUuid.has(u)&&inbOk(u));
+    if(!inbs.length)return;                                          // serves nothing visible
+    if(filters.search){const tags=inbs.map(u=>(MODEL.inboundByUuid.get(u)||{}).tag||'').join(' ');
+      if(!matchSearch(nodeLabel(n)+' '+(n.ips||[]).join(' ')+' '+tags))return;}
+    out.push({node:n,inboundUuids:inbs});
+  });
+  return out;
+}
 
 function renderStats(){
   const s=DATA.stats,distinct=DATA.panelUsersOnline!=null?DATA.panelUsersOnline:s.usersOnline;
@@ -566,6 +608,7 @@ function renderView(){
 function treeData(){
   const inbs=DATA.inbounds.filter(ib=>filters.inbound==='all'||ib.uuid===filters.inbound);
   const root={name:DATA.panel.replace(/^https?:\/\//,''),type:'root',children:[]};
+  const extra=unmatchedServingNodes();   // active nodes serving an inbound but absent from any host DNS
   inbs.forEach(ib=>{
     const hostsOn=DATA.hosts.filter(h=>h.inboundUuid===ib.uuid);
     const ibNode={name:ib.tag||ib.uuid.slice(0,8),type:'inbound',meta:ib,children:[]};
@@ -587,6 +630,8 @@ function treeData(){
       });
       if(hostNode.children.length||!filters.issuesOnly&&!filters.search)ibNode.children.push(hostNode);
     });
+    // serving-but-unmatched nodes attach straight under the inbound (no host domain reaches them)
+    extra.forEach(({node,inboundUuids})=>{ if(inboundUuids.includes(ib.uuid))ibNode.children.push({name:nodeLabel(node),type:'node',meta:node,notInDns:true}); });
     if(ibNode.children.length)root.children.push(ibNode);
   });
   return root;
@@ -613,7 +658,7 @@ function renderTree(){
   function update(src){
     tree(root); const nodes=root.descendants(),links=root.links();
     g.selectAll('path.lnk').data(links,d=>d.target.data.__id||(d.target.data.__id=++uid)).join(
-      en=>en.append('path').attr('class','lnk').attr('fill','none').attr('stroke','rgba(140,160,200,.22)').attr('stroke-width',1)
+      en=>en.append('path').attr('class','lnk').attr('fill','none').attr('stroke',d=>d.target.data.notInDns?'rgba(34,211,238,.35)':'rgba(140,160,200,.22)').attr('stroke-dasharray',d=>d.target.data.notInDns?'4 3':null).attr('stroke-width',1)
         .attr('d',d3.linkHorizontal().x(d=>src.y0).y(d=>src.x0)),
       up=>up,ex=>ex.transition().duration(dur).attr('d',d3.linkHorizontal().x(d=>src.y).y(d=>src.x)).remove())
       .transition().duration(dur).attr('d',d3.linkHorizontal().x(d=>d.y).y(d=>d.x));
@@ -624,6 +669,8 @@ function renderTree(){
       .on('mouseover',(e,d)=>tipTree(e,d)).on('mousemove',moveTip).on('mouseout',hideTip);
     en.append('circle').attr('r',rOf).attr('fill',d=>(filters.uniform&&treeGlyphKey(d))?'transparent':colOf(d)).attr('stroke',d=>d._children?'#fff':((filters.uniform&&treeGlyphKey(d))?'none':'rgba(255,255,255,.5)')).attr('stroke-width',d=>d._children?1.8:.8)
       .attr('class',d=>d.data.type==='domain'&&(d.data.dead||d.data.foreign)?'pulse-s':null);
+    // dashed cyan ring marks nodes that serve the inbound but aren't referenced by any host DNS
+    en.filter(d=>d.data.notInDns).append('circle').attr('r',d=>rOf(d)+4).attr('fill','none').attr('stroke','rgba(34,211,238,.9)').attr('stroke-dasharray','3 2').attr('stroke-width',1.1).attr('pointer-events','none');
     // Type glyph on each node (root stays a plain dot); scale with radius, skip on very large trees.
     if(nodes.length<=140||filters.uniform)glyphOn(en,d=>treeGlyphKey(d),colOf,d=>Math.max(13,rOf(d)*2.4));
     en.append('text').attr('dy',3).attr('x',d=>rOf(d)+5).attr('font-size',d=>d.data.type==='inbound'?12:10.5)
@@ -637,8 +684,8 @@ function renderTree(){
   }
   let uid=0; root.x0=H/2;root.y0=0; update(root);
   setTimeout(()=>fitTo(g,svg,W,H),420);
-  legend([[COLORS.inbound,'inbound','inbound'],[COLORS.host,'host','host'],[COLORS.domain,'domain','domain'],[COLORS.up,'node up','up'],[COLORS.down,'down','down'],[COLORS.foreign,'foreign/dead','foreign'],...STATUS_LEGEND]);
-  hint('click a node to expand · drag to pan · scroll to zoom');
+  legend([[COLORS.inbound,'inbound','inbound'],[COLORS.host,'host','host'],[COLORS.domain,'domain','domain'],[COLORS.up,'node up','up'],[COLORS.down,'down','down'],[COLORS.foreign,'foreign/dead','foreign'],[COLORS.up,'serves, not in DNS (dashed)','node'],...STATUS_LEGEND]);
+  hint('click a node to expand · drag to pan · scroll to zoom · dashed branch = node serves the inbound but no host domain resolves to it');
 }
 function openDetailFromTree(d){const t=d.data.type;
   if(t==='node'&&d.data.meta)showNodeDetail(d.data.meta);
@@ -648,7 +695,7 @@ function openDetailFromTree(d){const t=d.data.type;
 function tipTree(e,d){const t=d.data.type;
   const tic=t==='node'?entIcon('node',{down:nodeDown(d.data.meta)}):t==='domain'?entIcon('domain',{dead:d.data.dead,foreign:d.data.foreign}):entIcon(t);
   const st=t==='root'?null:(t==='domain'?entStatus('domain',{dead:d.data.dead,foreign:new Set(d.data.foreign?['x']:[])}):entStatus(t,d.data.meta));
-  let h=`<b>${tic}${esc(d.data.full||d.data.name)}</b> <span class="s">${t}${st&&st.label?' · '+st.label:''}</span>`;
+  let h=`<b>${tic}${esc(d.data.full||d.data.name)}</b> <span class="s">${t}${st&&st.label?' · '+st.label:''}${d.data.notInDns?' · not in DNS':''}</span>`;
   if(t==='node'&&d.data.meta){const n=d.data.meta;h+=`<br><span class="s">${(n.ips||[]).join(', ')}</span><br>${n.disabled?'disabled':n.connected?'online':'down'} · ${fmt(n.usersOnline)} users${(n.up||n.down)?` · ↑${fmtBytes(n.up)} ↓${fmtBytes(n.down)}`:''}`;}
   if(t==='inbound'&&d.data.meta)h+=`<br><span class="s">hosts ${d.data.meta.hostCount} · nodes ${d.data.meta.nodeCount}</span>`;
   showTipHtml(e,h);}
@@ -661,12 +708,17 @@ function renderTiers(){
   doms.forEach(d=>{d.inboundUuids.forEach(u=>inbUuids.add(u));
     d.matched.forEach(u=>nodeSet.set(u,MODEL.nodeByUuid.get(u)));
     d.foreign.forEach(ip=>foreignSet.set(ip,true));});
+  // Active nodes serving a visible inbound but absent from any host DNS: add to the node column and
+  // make sure their inbound is present so they can link straight to it.
+  const servingExtra=unmatchedServingNodes();
+  const servingUuids=new Set(servingExtra.map(x=>x.node.uuid));
+  servingExtra.forEach(({node,inboundUuids})=>{nodeSet.set(node.uuid,node);inboundUuids.forEach(u=>inbUuids.add(u));});
   DATA.hosts.forEach(h=>{ if(h.addresses.some(a=>{const k=a.kind==='domain'?a.domain:(a.ips[0]&&a.ips[0].ip);return k&&doms.find(d=>d.domain===k);}))hostSet.set(h.uuid,h);});
   const cols=[
     {key:'inb',x:W*0.10,items:DATA.inbounds.filter(i=>inbUuids.has(i.uuid)).map(i=>({id:'i:'+i.uuid,label:i.tag,color:COLORS.inbound,meta:i,type:'inbound'}))},
     {key:'host',x:W*0.37,items:[...hostSet.values()].map(h=>({id:'h:'+h.uuid,label:h.remark,color:entStatus('host',h).color,meta:h,type:'host'}))},
     {key:'dom',x:W*0.64,items:doms.map(d=>({id:'d:'+d.domain,label:short(d.domain),color:domStatus(d)==='dead'?COLORS.dead:domStatus(d)==='foreign'?COLORS.foreign:COLORS.domain,meta:d,type:'domain'}))},
-    {key:'node',x:W*0.90,items:[...nodeSet.values()].filter(Boolean).map(n=>({id:'n:'+n.uuid,label:nodeLabel(n),color:nodeColor(n),meta:n,type:'node',users:n.usersOnline}))
+    {key:'node',x:W*0.90,items:[...nodeSet.values()].filter(Boolean).map(n=>({id:'n:'+n.uuid,label:nodeLabel(n),color:nodeColor(n),meta:n,type:'node',users:n.usersOnline,notInDns:servingUuids.has(n.uuid)}))
       .concat([...foreignSet.keys()].map(ip=>({id:'f:'+ip,label:ip,color:COLORS.foreign,type:'foreign'})))},
   ];
   const pos={};
@@ -677,15 +729,22 @@ function renderTiers(){
     if(h.inboundUuid&&pos['i:'+h.inboundUuid])links.push([pos['i:'+h.inboundUuid],hi]);
     h.addresses.forEach(a=>{ const k=a.kind==='domain'?a.domain:(a.ips[0]&&a.ips[0].ip); const di=k&&pos['d:'+k]; if(!di)return; links.push([hi,di]);
       a.ips.forEach(x=>{const ni=x.nodeUuid?pos['n:'+x.nodeUuid]:pos['f:'+x.ip];if(ni)links.push([di,ni]);});});});
+  // inbound → node directly for serving-but-unmatched nodes (skip the host/domain columns).
+  servingExtra.forEach(({node,inboundUuids})=>{const ni=pos['n:'+node.uuid];if(!ni)return;
+    inboundUuids.forEach(u=>{const ii=pos['i:'+u];if(ii)links.push([ii,ni,'serves']);});});
   g.append('g').selectAll('path').data(links).join('path').attr('fill','none')
-    .attr('stroke',d=>d[1].type==='foreign'?'rgba(240,136,62,.4)':'rgba(120,150,200,.18)').attr('stroke-width',1)
+    .attr('stroke',d=>d[2]==='serves'?'rgba(34,211,238,.4)':d[1].type==='foreign'?'rgba(240,136,62,.4)':'rgba(120,150,200,.18)').attr('stroke-width',1)
+    .attr('stroke-dasharray',d=>d[2]==='serves'?'6 4':null)
     .attr('d',d=>`M${d[0].x},${d[0].y}C${(d[0].x+d[1].x)/2},${d[0].y} ${(d[0].x+d[1].x)/2},${d[1].y} ${d[1].x},${d[1].y}`);
   const all=cols.flatMap(c=>c.items);
   const gn=g.append('g').selectAll('g').data(all).join('g').attr('transform',d=>`translate(${d.x},${d.y})`).attr('opacity',d=>entStatus(d.type,d.meta).dim?0.45:1).style('cursor','pointer')
-    .on('click',(e,d)=>{e.stopPropagation();tierDetail(d);}).on('mouseover',(e,d)=>{const st=entStatus(d.type,d.meta);showTipHtml(e,`<b>${entIcon(d.type,{down:d.type==='node'&&nodeDown(d.meta),dead:d.type==='domain'&&domStatus(d.meta)==='dead',foreign:d.type==='domain'&&domStatus(d.meta)==='foreign'})}${esc(d.meta?(d.meta.name||d.meta.remark||d.meta.tag||d.label):d.label)}</b> <span class="s">${d.type}${st.label?' · '+st.label:''}</span>${d.type==='node'?`<br><span class="s">${(d.meta.ips||[]).join(', ')} · ${fmt(d.meta.usersOnline)} users</span>`:''}`);}).on('mousemove',moveTip).on('mouseout',hideTip);
+    .on('click',(e,d)=>{e.stopPropagation();tierDetail(d);}).on('mouseover',(e,d)=>{const st=entStatus(d.type,d.meta);showTipHtml(e,`<b>${entIcon(d.type,{down:d.type==='node'&&nodeDown(d.meta),dead:d.type==='domain'&&domStatus(d.meta)==='dead',foreign:d.type==='domain'&&domStatus(d.meta)==='foreign'})}${esc(d.meta?(d.meta.name||d.meta.remark||d.meta.tag||d.label):d.label)}</b> <span class="s">${d.type}${st.label?' · '+st.label:''}${d.notInDns?' · not in DNS':''}</span>${d.type==='node'?`<br><span class="s">${(d.meta.ips||[]).join(', ')} · ${fmt(d.meta.usersOnline)} users</span>`:''}`);}).on('mousemove',moveTip).on('mouseout',hideTip);
   gn.append('circle').attr('r',d=>filters.uniform?6:(d.type==='node'?Math.max(3,4+Math.sqrt(d.users||0)*0.2):d.type==='inbound'?7:5)).attr('fill',d=>filters.uniform?'transparent':d.color)
     .attr('stroke',filters.uniform?'none':'rgba(255,255,255,.5)').attr('stroke-width',.7).attr('filter',d=>(!filters.uniform&&d.type==='inbound')?'url(#gl)':null)
     .attr('class',d=>d.type==='foreign'||(d.type==='domain'&&domStatus(d.meta)!=='ok')?'pulse-s':null);
+  // dashed cyan ring marks nodes that serve the inbound but aren't referenced by any host DNS
+  gn.filter(d=>d.notInDns).append('circle').attr('r',d=>(filters.uniform?6:Math.max(3,4+Math.sqrt(d.users||0)*0.2))+4)
+    .attr('fill','none').attr('stroke','rgba(34,211,238,.9)').attr('stroke-dasharray','3 2').attr('stroke-width',1.1).attr('pointer-events','none');
   // Type glyph centered on each tier node (color already computed in d.color); skip when crowded.
   if(all.length<=140||filters.uniform)glyphOn(gn,d=>d.type==='node'?(nodeDown(d.meta)?'down':'node'):d.type,d=>d.color,
     d=>filters.uniform?16:Math.max(13,(d.type==='node'?Math.max(3,4+Math.sqrt(d.users||0)*0.2):d.type==='inbound'?7:5)*2.4));
@@ -695,8 +754,8 @@ function renderTiers(){
     .text(d=>d.label&&d.label.length>22?d.label.slice(0,21)+'…':d.label);
   cols.forEach(c=>g.append('text').attr('x',c.x).attr('y',26).attr('text-anchor','middle').attr('font-size',11).attr('fill',COLORS.inbound==c.items[0]?.color?'#cdbcff':'var(--mut)').attr('fill','#7e8aa5').text({inb:'INBOUNDS',host:'HOSTS',dom:'DOMAINS',node:'NODES / IPs'}[c.key]+` (${c.items.length})`));
   setTimeout(()=>fitTo(g,svg,W,H),60);
-  legend([[COLORS.inbound,'inbound','inbound'],[COLORS.host,'host','host'],[COLORS.domain,'domain','domain'],[COLORS.up,'node up','up'],[COLORS.foreign,'foreign IP','foreign'],...STATUS_LEGEND]);
-  hint('columns: inbound → host → domain → node · drag/scroll to navigate');
+  legend([[COLORS.inbound,'inbound','inbound'],[COLORS.host,'host','host'],[COLORS.domain,'domain','domain'],[COLORS.up,'node up','up'],[COLORS.foreign,'foreign IP','foreign'],[COLORS.up,'serves, not in DNS (dashed)','node'],...STATUS_LEGEND]);
+  hint('columns: inbound → host → domain → node · dashed = node serves the inbound but no host domain resolves to it · drag/scroll to navigate');
 }
 function tierDetail(d){if(d.type==='node')showNodeDetail(d.meta);else if(d.type==='domain')showDomainDetailByName(d.meta.domain);else if(d.type==='host')showHostDetail(d.meta);else if(d.type==='inbound')showInboundDetail(d.meta);}
 
@@ -715,6 +774,12 @@ function renderSankey(){
       links.push({source:di,target:ni,value:Math.max(n.usersOnline,1)});});
     d.foreign.forEach(ip=>{const fi=addNode('f:'+ip,ip,'foreign');links.push({source:di,target:fi,value:1});});
   });
+  // Active nodes serving a visible inbound but absent from any host DNS → flow straight from the inbound.
+  unmatchedServingNodes().forEach(({node,inboundUuids})=>{
+    const ni=addNode('n:'+node.uuid,nodeLabel(node),'node',node); nodes[ni].notInDns=true;
+    inboundUuids.forEach(u=>{const ib=MODEL.inboundByUuid.get(u);const ii=addNode('i:'+u,ib?ib.tag:'inb','inbound',ib);
+      links.push({source:ii,target:ni,value:Math.max(node.usersOnline,1),serves:true});});
+  });
   if(!nodes.length){vp.appendChild(Object.assign(document.createElement('div'),{className:'empty',innerHTML:'Nothing to flow with current filters.'}));return;}
   const {svg,g}=makeSvg(vp,W,H);
   const cInb=nodes.filter(n=>n.type==='inbound').length,cDom=nodes.filter(n=>n.type==='domain').length,cNode=nodes.filter(n=>n.type==='node'||n.type==='foreign').length;
@@ -724,12 +789,14 @@ function renderSankey(){
   let graph; try{graph=sk({nodes:nodes.map(d=>({...d})),links:links.map(l=>({...l}))});}catch(e){vp.appendChild(Object.assign(document.createElement('div'),{className:'empty',innerHTML:'Sankey layout error: '+e.message}));return;}
   const col=n=>n.type==='inbound'?COLORS.inbound:n.type==='domain'?(n.meta&&n.meta.foreign.size?COLORS.foreign:COLORS.domain):n.type==='foreign'?COLORS.foreign:nodeColor(n.meta);
   g.append('g').attr('fill','none').selectAll('path').data(graph.links).join('path').attr('d',d3.sankeyLinkHorizontal())
-    .attr('stroke',d=>d.target.type==='foreign'?'rgba(240,136,62,.35)':'rgba(120,150,200,.18)')
-    .attr('stroke-width',d=>Math.max(1,d.width)).on('mouseover',(e,d)=>showTipHtml(e,`<b>${esc(d.source.name)} → ${esc(d.target.name)}</b><br><span class="s">${fmt(d.value)} users</span>`)).on('mousemove',moveTip).on('mouseout',hideTip);
+    .attr('stroke',d=>d.serves?'rgba(34,211,238,.4)':d.target.type==='foreign'?'rgba(240,136,62,.35)':'rgba(120,150,200,.18)')
+    .attr('stroke-dasharray',d=>d.serves?'6 4':null)
+    .attr('stroke-width',d=>Math.max(1,d.width)).on('mouseover',(e,d)=>showTipHtml(e,`<b>${esc(d.source.name)} → ${esc(d.target.name)}</b><br><span class="s">${fmt(d.value)} users${d.serves?' · serves inbound, not in DNS':''}</span>`)).on('mousemove',moveTip).on('mouseout',hideTip);
   const gn=g.append('g').selectAll('g').data(graph.nodes).join('g').attr('opacity',d=>entStatus(d.type,d.meta).dim?0.45:1).style('cursor','pointer')
     .on('click',(e,d)=>{e.stopPropagation();if(d.type==='node')showNodeDetail(d.meta);else if(d.type==='domain')showDomainDetailByName(d.meta.domain);else if(d.type==='inbound')showInboundDetail(d.meta);})
-    .on('mouseover',(e,d)=>{const st=entStatus(d.type,d.meta);showTipHtml(e,`<b>${entIcon(d.type,{down:d.type==='node'&&nodeDown(d.meta),foreign:d.type==='domain'&&d.meta&&d.meta.foreign&&d.meta.foreign.size>0})}${esc(d.name)}</b> <span class="s">${d.type}${st.label?' · '+st.label:''}</span>`);}).on('mousemove',moveTip).on('mouseout',hideTip);
-  gn.append('rect').attr('x',d=>d.x0).attr('y',d=>d.y0).attr('height',d=>Math.max(1,d.y1-d.y0)).attr('width',d=>d.x1-d.x0).attr('fill',col).attr('rx',2);
+    .on('mouseover',(e,d)=>{const st=entStatus(d.type,d.meta);showTipHtml(e,`<b>${entIcon(d.type,{down:d.type==='node'&&nodeDown(d.meta),foreign:d.type==='domain'&&d.meta&&d.meta.foreign&&d.meta.foreign.size>0})}${esc(d.name)}</b> <span class="s">${d.type}${st.label?' · '+st.label:''}${d.notInDns?' · not in DNS':''}</span>`);}).on('mousemove',moveTip).on('mouseout',hideTip);
+  gn.append('rect').attr('x',d=>d.x0).attr('y',d=>d.y0).attr('height',d=>Math.max(1,d.y1-d.y0)).attr('width',d=>d.x1-d.x0).attr('fill',col).attr('rx',2)
+    .attr('stroke',d=>d.notInDns?'rgba(34,211,238,.95)':null).attr('stroke-dasharray',d=>d.notInDns?'3 2':null).attr('stroke-width',d=>d.notInDns?1.3:null);
   gn.append('text').attr('x',d=>d.x0<W/2?d.x1+5:d.x0-5).attr('y',d=>(d.y0+d.y1)/2).attr('dy',3).attr('text-anchor',d=>d.x0<W/2?'start':'end')
     .attr('font-size',10.5).attr('fill','rgba(231,236,245,.82)').attr('paint-order','stroke').attr('stroke','rgba(7,10,20,.82)').attr('stroke-width',2.2)
     .text(d=>(d.y1-d.y0)>6?d.name:'');
@@ -739,20 +806,24 @@ function renderSankey(){
       d=>d.x0<W/2?d.x1+5+SZ/2:d.x0-5-SZ/2,d=>(d.y0+d.y1)/2);
     gn.selectAll('text').attr('x',d=>d.x0<W/2?d.x1+5+SZ+3:d.x0-5-SZ-3);}
   setTimeout(()=>fitTo(g,svg,W,H),60);
-  legend([[COLORS.inbound,'inbound','inbound'],[COLORS.domain,'domain','domain'],[COLORS.up,'node (width = users)','up'],[COLORS.foreign,'foreign IP','foreign'],...STATUS_LEGEND]);
-  hint('flow width = users online · drag/scroll to navigate');
+  legend([[COLORS.inbound,'inbound','inbound'],[COLORS.domain,'domain','domain'],[COLORS.up,'node (width = users)','up'],[COLORS.foreign,'foreign IP','foreign'],[COLORS.up,'serves, not in DNS (dashed)','node'],...STATUS_LEGEND]);
+  hint('flow width = users online · dashed = node serves the inbound but no host domain resolves to it · drag/scroll to navigate');
 }
 
 /* ---------------- MATRIX (domain × node) ---------------- */
 function renderMatrix(){
   const vp=clearVP();
   const doms=filteredDomains();
-  const nodeUuids=[...new Set(doms.flatMap(d=>[...d.matched]))]
+  // Include active nodes serving a visible inbound but absent from any host DNS as extra columns —
+  // their column stays empty (no domain resolves to them), which is exactly the gap worth seeing.
+  const extra=unmatchedServingNodes(); const extraUuids=new Set(extra.map(x=>x.node.uuid));
+  const uuidSet=new Set(doms.flatMap(d=>[...d.matched])); extraUuids.forEach(u=>uuidSet.add(u));
+  const nodeUuids=[...uuidSet]
     .map(u=>MODEL.nodeByUuid.get(u)).filter(Boolean)
     .sort((a,b)=>String(a.name).localeCompare(String(b.name),undefined,{numeric:true}));
   if(!doms.length){vp.innerHTML='<div class="empty" style="margin-top:80px">No domains match the current filters.</div>';return;}
   const wrap=document.createElement('div');wrap.className='mx-wrap';
-  let head='<tr><th class="corner">domain ▸ node</th>'+nodeUuids.map(n=>`<th title="${esc(n.name)} · ${(n.ips||[]).join(', ')}"><div class="rot" style="color:${nodeColor(n)}">${esc(n.name)}</div></th>`).join('')+'<th class="corner" style="left:auto;min-width:70px">issues</th></tr>';
+  let head='<tr><th class="corner">domain ▸ node</th>'+nodeUuids.map(n=>{const nd=extraUuids.has(n.uuid);return `<th title="${esc(n.name)} · ${(n.ips||[]).join(', ')}${nd?' · serves inbound, not in any host DNS':''}"><div class="rot" style="color:${nodeColor(n)}${nd?';opacity:.7':''}">${nd?'∅ ':''}${esc(n.name)}</div></th>`;}).join('')+'<th class="corner" style="left:auto;min-width:70px">issues</th></tr>';
   let rows=doms.map(d=>{
     const st=domStatus(d),sc=st==='dead'?COLORS.dead:st==='foreign'?COLORS.foreign:COLORS.domain;
     const cells=nodeUuids.map(n=>{const on=d.matched.has(n.uuid);
@@ -765,7 +836,7 @@ function renderMatrix(){
   wrap.querySelectorAll('td.rowh').forEach(td=>td.onclick=()=>showDomainDetailByName(td.dataset.d));
   wrap.querySelectorAll('td.cell').forEach(td=>td.onclick=()=>{showDomainDetailByName(td.dataset.d);});
   legend([[COLORS.up,'domain → node match','node'],[COLORS.foreign,'foreign IPs (badge)','foreign'],[COLORS.dead,'dead DNS','domain']]);
-  hint(`${doms.length} domains × ${nodeUuids.length} nodes · cyan = domain resolves to that node · gaps = missing`);
+  hint(`${doms.length} domains × ${nodeUuids.length} nodes · cyan = domain resolves to that node · ∅ column = node serves an inbound but no host domain resolves to it`);
 }
 
 /* ---------------- COUNTRIES (group by country) ---------------- */
@@ -804,19 +875,25 @@ function renderForce(){
     d.inboundUuids.forEach(u=>{if(by['i:'+u])links.push({source:'i:'+u,target:'d:'+d.domain});});
     d.matched.forEach(u=>{const n=MODEL.nodeByUuid.get(u);if(!n)return;add({id:'n:'+u,type:'node',label:nodeLabel(n),meta:n});if(!filters.overlay)links.push({source:'d:'+d.domain,target:'n:'+u});});
     d.foreign.forEach(ip=>{add({id:'f:'+ip,type:'foreign',label:ip});links.push({source:'d:'+d.domain,target:'f:'+ip});});});
+  // Active nodes serving a visible inbound but absent from any host DNS → hang straight off the inbound hub.
+  // (In Overlay mode these are already folded into d.matched, so the helper returns nothing here.)
+  unmatchedServingNodes().forEach(({node,inboundUuids})=>{add({id:'n:'+node.uuid,type:'node',label:nodeLabel(node),meta:node,notInDns:true});
+    inboundUuids.forEach(u=>{if(by['i:'+u])links.push({source:'i:'+u,target:'n:'+node.uuid,serves:true});});});
   // Overlay: route node links through the inbound hub (inbound -> serving node) instead of
   // domain -> every node, which turned each cluster into an all-to-all mesh. Cluster becomes a star.
   if(filters.overlay){const seen=new Set();
     nodesA.forEach(o=>{if(o.type!=='node')return;((o.meta&&o.meta.serves)||[]).forEach(u=>{const id='i:'+u;if(by[id]){const k=id+'>'+o.id;if(!seen.has(k)){seen.add(k);links.push({source:id,target:o.id});}}});});}
   const rOf=d=>filters.uniform?7:(d.type==='inbound'?11:d.type==='node'?5+Math.sqrt((d.meta&&d.meta.usersOnline)||0)*0.32:d.type==='domain'?7:5);
   const colOf=d=>d.type==='inbound'?COLORS.inbound:d.type==='domain'?(d.status==='dead'?COLORS.dead:d.status==='foreign'?COLORS.foreign:COLORS.domain):d.type==='node'?nodeColor(d.meta):COLORS.foreign;
-  const link=g.append('g').selectAll('line').data(links).join('line').attr('stroke','rgba(130,150,200,.2)').attr('stroke-width',1);
+  const link=g.append('g').selectAll('line').data(links).join('line').attr('stroke',d=>d.serves?'rgba(34,211,238,.4)':'rgba(130,150,200,.2)').attr('stroke-dasharray',d=>d.serves?'6 4':null).attr('stroke-width',1);
   const gn=g.append('g').selectAll('g').data(nodesA).join('g').attr('opacity',d=>entStatus(d.type,d.meta).dim?0.45:1).style('cursor','pointer')
     .call(d3.drag().on('start',(e,d)=>{if(!e.active)sim.alphaTarget(.3).restart();d.fx=d.x;d.fy=d.y;}).on('drag',(e,d)=>{d.fx=e.x;d.fy=e.y;}).on('end',(e,d)=>{if(!e.active)sim.alphaTarget(0);d.fx=null;d.fy=null;}))
     .on('click',(e,d)=>{e.stopPropagation();if(d.type==='node')showNodeDetail(d.meta);else if(d.type==='domain')showDomainDetailByName(d.full);else if(d.type==='inbound')showInboundDetail(d.meta);})
-    .on('mouseover',(e,d)=>{const st=entStatus(d.type,d.meta);showTipHtml(e,`<b>${entIcon(d.type,{down:d.type==='node'&&nodeDown(d.meta),dead:d.status==='dead',foreign:d.status==='foreign'})}${esc(d.full||d.label)}</b> <span class="s">${d.type}${st.label?' · '+st.label:''}</span>${d.type==='node'?`<br><span class="s">${(d.meta.ips||[]).join(', ')} · ${fmt(d.meta.usersOnline)} users</span>`:''}`);}).on('mousemove',moveTip).on('mouseout',hideTip);
+    .on('mouseover',(e,d)=>{const st=entStatus(d.type,d.meta);showTipHtml(e,`<b>${entIcon(d.type,{down:d.type==='node'&&nodeDown(d.meta),dead:d.status==='dead',foreign:d.status==='foreign'})}${esc(d.full||d.label)}</b> <span class="s">${d.type}${st.label?' · '+st.label:''}${d.notInDns?' · not in DNS':''}</span>${d.type==='node'?`<br><span class="s">${(d.meta.ips||[]).join(', ')} · ${fmt(d.meta.usersOnline)} users</span>`:''}`);}).on('mousemove',moveTip).on('mouseout',hideTip);
   gn.append('circle').attr('r',rOf).attr('fill',d=>filters.uniform?'transparent':colOf(d)).attr('stroke',filters.uniform?'none':'rgba(255,255,255,.55)').attr('stroke-width',.8)
     .attr('filter',d=>(!filters.uniform&&d.type==='inbound')?'url(#gl)':null).attr('class',d=>d.type==='foreign'||(d.type==='domain'&&d.status!=='ok')?'pulse-s':null);
+  // dashed cyan ring marks nodes that serve the inbound but aren't referenced by any host DNS
+  gn.filter(d=>d.notInDns).append('circle').attr('r',d=>rOf(d)+4).attr('fill','none').attr('stroke','rgba(34,211,238,.9)').attr('stroke-dasharray','3 2').attr('stroke-width',1.1).attr('pointer-events','none');
   // Type glyph on each force node; scale with radius, reuse the same >140 threshold as labels.
   if(nodesA.length<=140||filters.uniform)glyphOn(gn,d=>d.type==='node'?(nodeDown(d.meta)?'down':'node'):d.type,colOf,d=>Math.max(13,rOf(d)*2.4));
   gn.append('text').attr('x',d=>rOf(d)+4).attr('dy',3).attr('font-size',d=>d.type==='inbound'?12:10).attr('fill','rgba(231,236,245,.8)')
@@ -831,8 +908,8 @@ function renderForce(){
     .force('x',d3.forceX(d=>{const u=d.type==='inbound'?d.meta.uuid:null;const k=u?ibIndex.get(u):2;return (W*0.12)+((k%5)/4)*(W*0.76);}).strength(.05))
     .force('y',d3.forceY(H/2).strength(.05)).force('collide',d3.forceCollide().radius(d=>rOf(d)+7)).force('center',d3.forceCenter(W/2,H/2))
     .on('tick',()=>{link.attr('x1',d=>d.source.x).attr('y1',d=>d.source.y).attr('x2',d=>d.target.x).attr('y2',d=>d.target.y);gn.attr('transform',d=>`translate(${d.x},${d.y})`);});
-  legend([[COLORS.inbound,'inbound','inbound'],[COLORS.domain,'domain','domain'],[COLORS.up,'node up','up'],[COLORS.down,'down','down'],[COLORS.foreign,'foreign/dead','foreign'],...STATUS_LEGEND]);
-  hint('drag nodes · scroll to zoom — Tree/Tiers/Matrix are clearer at scale');
+  legend([[COLORS.inbound,'inbound','inbound'],[COLORS.domain,'domain','domain'],[COLORS.up,'node up','up'],[COLORS.down,'down','down'],[COLORS.foreign,'foreign/dead','foreign'],[COLORS.up,'serves, not in DNS (dashed)','node'],...STATUS_LEGEND]);
+  hint('drag nodes · scroll to zoom · dashed link = node serves the inbound but no host domain resolves to it — Tree/Tiers/Matrix are clearer at scale');
 }
 
 /* ---------------- shared: fit, tooltip, details ---------------- */
@@ -849,10 +926,11 @@ function copyText(v){const ok=()=>showToast('Copied: '+v);const fb=()=>{try{cons
 document.addEventListener('click',e=>{const el=e.target.closest&&e.target.closest('.cp');if(el&&el.dataset.copy!=null){e.stopPropagation();copyText(el.dataset.copy);}});
 function showNodeDetail(n){
   const st=n.disabled?'dis':n.connected?'up':'down';
+  const notInDns=!n.reachableByDomain&&(n.serves||[]).length>0;   // serves an inbound but no host domain resolves to it
   const inbs=(n.serves||[]).map(u=>(MODEL.inboundByUuid.get(u)||{}).tag||String(u).slice(0,8));
   const doms=MODEL.domains.filter(d=>d.matched.has(n.uuid));
   const domHtml=doms.length?doms.map(d=>'<div class="chain-row"><b>'+esc(d.domain)+'</b> <span class="s">'+esc([...d.inboundTags].join(', '))+'</span><div class="s">via hosts: '+esc(d.hosts.join(', '))+'</div></div>').join(''):'<div class="s">No host domain currently routes to this node.</div>';
-  els.modalBody.innerHTML='<div class="det-title">'+entIcon('node',{down:st==='down',color:st==='dis'?COLORS.dis:st==='down'?COLORS.down:COLORS.up})+(flag(n.country)?flag(n.country)+' ':'')+esc(n.name)+' <span class="badge '+st+'">'+(st==='up'?'online':st==='down'?'down':'disabled')+'</span></div>'+kv('Public IP(s)',(n.ips&&n.ips.length)?n.ips.map(ip=>esc(ip)+cp(ip)).join('<br>'):'-')+kv('Mgmt',esc(n.mgmtAddress)+':'+(n.port||'')+cp(n.mgmtAddress))+kv('Country',(n.country?flag(n.country)+' '+n.country:'-'))+kv('Users online',fmt(n.usersOnline))+kv('Live ↑ / ↓',fmtBytes(n.up)+' / '+fmtBytes(n.down))+(n.limitBytes?kv('Traffic used',fmtBytes(n.usedBytes)+' / '+fmtBytes(n.limitBytes)+' ('+Math.round((n.usedBytes||0)/n.limitBytes*100)+'%)'):kv('Traffic used',n.usedBytes!=null?fmtBytes(n.usedBytes):'—'))+kv('Reachable by domain',n.reachableByDomain?'yes':'no')+'<div class="chain-sec"><h4>Serves inbounds ('+inbs.length+')</h4><div class="pillist">'+(inbs.length?inbs.map(t=>'<span class="pill">'+esc(t)+'</span>').join(''):'<span class="s">none</span>')+'</div></div><div class="chain-sec"><h4>Reachable via ('+doms.length+' domains)</h4>'+domHtml+'</div>';
+  els.modalBody.innerHTML='<div class="det-title">'+entIcon('node',{down:st==='down',color:st==='dis'?COLORS.dis:st==='down'?COLORS.down:COLORS.up})+(flag(n.country)?flag(n.country)+' ':'')+esc(n.name)+' <span class="badge '+st+'">'+(st==='up'?'online':st==='down'?'down':'disabled')+'</span>'+(notInDns?' <span class="badge" style="background:rgba(34,211,238,.12);border:1px dashed rgba(34,211,238,.6);color:var(--acc-hi)" title="This node serves an inbound but no host domain resolves to its IP">not in DNS</span>':'')+'</div>'+kv('Public IP(s)',(n.ips&&n.ips.length)?n.ips.map(ip=>esc(ip)+cp(ip)).join('<br>'):'-')+kv('Mgmt',esc(n.mgmtAddress)+':'+(n.port||'')+cp(n.mgmtAddress))+kv('Country',(n.country?flag(n.country)+' '+n.country:'-'))+kv('Users online',fmt(n.usersOnline))+kv('Live ↑ / ↓',fmtBytes(n.up)+' / '+fmtBytes(n.down))+(n.limitBytes?kv('Traffic used',fmtBytes(n.usedBytes)+' / '+fmtBytes(n.limitBytes)+' ('+Math.round((n.usedBytes||0)/n.limitBytes*100)+'%)'):kv('Traffic used',n.usedBytes!=null?fmtBytes(n.usedBytes):'—'))+kv('Reachable by domain',n.reachableByDomain?'yes':'no')+'<div class="chain-sec"><h4>Serves inbounds ('+inbs.length+')</h4><div class="pillist">'+(inbs.length?inbs.map(t=>'<span class="pill">'+esc(t)+'</span>').join(''):'<span class="s">none</span>')+'</div></div><div class="chain-sec"><h4>Reachable via ('+doms.length+' domains)</h4>'+domHtml+'</div>';
   els.modalBg.classList.add('show');
 }function showDomainDetailByName(name){const d=MODEL.domains.find(x=>x.domain===name);if(!d)return;switchTab('details');const hasDownNode=[...d.matched].some(u=>nodeDown(MODEL.nodeByUuid.get(u)));
   const a=DATA.hosts.flatMap(h=>h.addresses).find(z=>z.domain===name)||{ips:[],source:''};
@@ -886,7 +964,7 @@ sideCloseEl.onclick=closeSide;
 sideBackdropEl.onclick=closeSide;
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeSide();});
 let rT;window.addEventListener('resize',()=>{clearTimeout(rT);rT=setTimeout(()=>{if(DATA)renderView();},250);});
-if(els.panelUrl.value&&els.token.value){doScan().then(setupAuto);}
+if(els.panelUrl.value&&(els.token.value||els.cookieHdr.value)){doScan().then(setupAuto);}
 </script>
 </body>
 </html>

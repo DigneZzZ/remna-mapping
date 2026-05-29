@@ -69,6 +69,20 @@ function normalizePanelUrl(u) {
   return u;
 }
 
+// Some Remnawave deployments sit behind a reverse proxy that ALSO gates the panel API with a
+// session/auth cookie (in addition to — or instead of — the API token). This normalizes the
+// user-supplied cookie into a single `Cookie:` header value. Accepts either a raw header string
+// ("name=value; name2=val2") or a JSON object ({"name":"value"}). Returns null when empty.
+function parseCookieHeader(s) {
+  if (s == null) return null;
+  s = String(s).trim();
+  if (!s) return null;
+  if (s.startsWith('{')) {
+    try { return Object.entries(JSON.parse(s)).map(([k, v]) => `${k}=${v}`).join('; '); } catch { /* fall through to raw */ }
+  }
+  return s;
+}
+
 function withTimeout(promise, ms, onTimeoutValue) {
   let t;
   const timeout = new Promise((res) => { t = setTimeout(() => res(onTimeoutValue), ms); });
@@ -99,22 +113,22 @@ function releaseScanSlot() {
   const next = scanWaiters.shift();
   if (next) next(true); else activeScans--;       // hand the slot to the next waiter, or free it
 }
-function scanWithTimeout(panelUrl, token, ms) {
+function scanWithTimeout(panelUrl, token, ms, opts) {
   return new Promise((resolve, reject) => {
     const t = setTimeout(() => reject(new Error('scan timed out after ' + ms + 'ms')), ms);
-    scan(panelUrl, token).then((v) => { clearTimeout(t); resolve(v); }, (e) => { clearTimeout(t); reject(e); });
+    scan(panelUrl, token, opts).then((v) => { clearTimeout(t); resolve(v); }, (e) => { clearTimeout(t); reject(e); });
   });
 }
 
-async function panelGet(base, token, p) {
+async function panelGet(base, token, p, extra) {
   const url = base + p;
   const ctrl = new AbortController();
   const to = setTimeout(() => ctrl.abort(), 20000);
   try {
-    const r = await fetch(url, {
-      headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
-      signal: ctrl.signal,
-    });
+    const headers = { 'Content-Type': 'application/json' };
+    if (token) headers.Authorization = 'Bearer ' + token;   // omit only for cookie-only panels
+    if (extra) Object.assign(headers, extra);                // e.g. { Cookie: '...' } for proxy-gated panels
+    const r = await fetch(url, { headers, signal: ctrl.signal });
     const text = await r.text();
     let body; try { body = JSON.parse(text); } catch { body = text; }
     return { ok: r.ok, status: r.status, body };
@@ -174,14 +188,20 @@ function splitAddress(addr) {
 }
 
 // ---------- core scan ----------
-async function scan(panelUrl, token) {
+async function scan(panelUrl, token, opts) {
   const base = normalizePanelUrl(panelUrl);
+  // Optional Cookie header for panels behind a proxy that also gates the API by session cookie.
+  // Sent ONLY to the user's own panel — never stored or logged. (see parseCookieHeader)
+  const extra = {};
+  if (opts && opts.cookieHeader) { const c = parseCookieHeader(opts.cookieHeader); if (c) extra.Cookie = c; }
+  const hdr = Object.keys(extra).length ? extra : undefined;
+  const pg = (p) => panelGet(base, token, p, hdr);
   const [hostsR, nodesR, profR, statsR, metricsR] = await Promise.all([
-    panelGet(base, token, '/api/hosts'),
-    panelGet(base, token, '/api/nodes'),
-    panelGet(base, token, '/api/config-profiles').catch(() => ({ ok: false })),
-    panelGet(base, token, '/api/system/stats').catch(() => ({ ok: false })),
-    panelGet(base, token, '/api/system/nodes/metrics').catch(() => ({ ok: false })),
+    pg('/api/hosts'),
+    pg('/api/nodes'),
+    pg('/api/config-profiles').catch(() => ({ ok: false })),
+    pg('/api/system/stats').catch(() => ({ ok: false })),
+    pg('/api/system/nodes/metrics').catch(() => ({ ok: false })),
   ]);
 
   if (!hostsR.ok) throw new Error('GET /api/hosts failed: HTTP ' + hostsR.status + ' ' + JSON.stringify(hostsR.body).slice(0, 200));
@@ -426,12 +446,12 @@ const server = http.createServer((req, res) => {
       res.setHeader('content-type', 'application/json; charset=utf-8');
       let creds;
       try { creds = JSON.parse(body || '{}'); } catch { res.writeHead(400); return res.end(JSON.stringify({ error: 'invalid JSON body' })); }
-      const { panelUrl, token } = creds || {};
-      if (!panelUrl || !token) { res.writeHead(400); return res.end(JSON.stringify({ error: 'panelUrl and token are required' })); }
+      const { panelUrl, token, cookieHeader } = creds || {};
+      if (!panelUrl || (!token && !cookieHeader)) { res.writeHead(400); return res.end(JSON.stringify({ error: 'panelUrl and a token (or Cookie header) are required' })); }
       const slot = await acquireScanSlot();
       if (!slot) { res.writeHead(503, { 'retry-after': '5' }); return res.end(JSON.stringify({ error: 'server busy — too many concurrent scans, retry shortly' })); }
       try {
-        const out = await scanWithTimeout(panelUrl, token, SCAN_TIMEOUT_MS);
+        const out = await scanWithTimeout(panelUrl, token, SCAN_TIMEOUT_MS, cookieHeader ? { cookieHeader } : undefined);
         res.writeHead(200); res.end(JSON.stringify(out));
       } catch (e) {
         res.writeHead(/timed out/.test(e.message) ? 504 : 500); res.end(JSON.stringify({ error: e.message }));
@@ -448,4 +468,4 @@ const server = http.createServer((req, res) => {
 if (require.main === module) {
   server.listen(PORT, () => console.log(`VPN Topology Mapper running on http://0.0.0.0:${PORT}  (DoH fallback: ${DOH ? 'on' : 'off'})`));
 }
-module.exports = { scan, resolveHost, parseBytes };
+module.exports = { scan, resolveHost, parseBytes, parseCookieHeader };

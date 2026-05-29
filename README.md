@@ -5,7 +5,7 @@ A small web service for Remnawave panels. Enter your **panel URL** and **API tok
 
 - pulls every **host** (connection entry points / domains) and every **node** (servers / IPs) from the panel,
 - **resolves each host domain via DNS** and matches the resulting IPs against your nodes,
-- **visualizes** the whole **host → domain → IP → node** relationship across **six views** (tree, tiers, sankey, matrix, by-country, force) on a dark canvas — with **entity icons**, **per-element status** (active / down / disabled), live **users online**, and **traffic** (cumulative usage + live per-inbound throughput),
+- **visualizes** the whole **host → domain → IP → node** relationship across **six views** (tree, tiers, sankey, matrix, by-country, force) on a dark canvas — with **entity icons**, **per-element status** (active / down / disabled), live **users online**, and **traffic** (cumulative usage + live per-inbound throughput). **Every active node is drawn**, including those that serve an inbound but that no host domain resolves to — these are linked straight to their inbound and flagged with a **dashed "not in DNS" marker** (previously such nodes were invisible in every view but Countries),
 - flags **inconsistencies**: dead DNS, IPs not registered as nodes, stale IP hosts, backend nodes no domain points to, shared node IPs, partial balancers, cross-inbound domain reuse, and nodes near/over their traffic limit.
 
 It's built for the exact layout you have in Granit: hosts carry subdomains (sometimes comma-separated balancer lists), nodes carry IPs, and a host's public IP can live in either the node's `address` or its `name` — the matcher checks both.
@@ -28,6 +28,8 @@ Then in the UI:
 1. Panel URL — e.g. `panel.me.pro` (scheme optional).
 2. API token — a Remnawave API-role token (Bearer).
 3. **Scan**. Toggle **Auto** for periodic refresh (15s–2m).
+
+If your panel API sits **behind a reverse proxy that also requires a session cookie** (some self-hosted setups gate the API by cookie in addition to — or instead of — the token), click **Cookie** in the top bar and paste the cookie. It accepts a raw header string (`name=value; name2=val2`) or a JSON object (`{"name":"value"}`), and is sent only to your panel alongside the token. Leave it empty for normal Bearer-token panels.
 
 To change the exposed port, edit the `ports:` mapping in `docker-compose.yml`.
 
@@ -74,11 +76,11 @@ Pick a layout from the toolbar — each renders the same scan a different way:
 | **Tree** | Collapsible hierarchy `inbound → host → domain → node` (use **Expand all** / **Collapse**). |
 | **Tiers** | Layered columns: inbounds → hosts → domains → nodes/IPs. |
 | **Sankey** | Flow diagram; link width = users online. |
-| **Matrix** | `domain × node` grid — a green cell means that domain resolves to that node. |
+| **Matrix** | `domain × node` grid — a cyan cell means that domain resolves to that node. A node column prefixed **∅** (all-empty) serves an inbound but no host domain resolves to it. |
 | **Countries** | Nodes grouped by country, sorted by users online. |
 | **Force** | Clustered force-directed graph (in Overlay it clusters as a star per inbound). |
 
-Every element carries an **entity icon** (inbound / host / node / domain / IP) and a **status**: active, **down** (disconnected), or **disabled/hidden** (dimmed + greyed); domains show **ok / dead / foreign**. Click any element for a detail panel (IPs, inbounds, traffic, what it connects to). Click the **⧉** beside an IP or domain to copy it.
+Every element carries an **entity icon** (inbound / host / node / domain / IP) and a **status**: active, **down** (disconnected), or **disabled/hidden** (dimmed + greyed); domains show **ok / dead / foreign**. Nodes that serve an inbound but that no host domain resolves to get a **dashed cyan ring** (and a **not in DNS** badge in their detail panel), and are connected to their inbound by a **dashed link** — so an active server that isn't referenced by any balancer domain is visible instead of silently dropped. Click any element for a detail panel (IPs, inbounds, traffic, what it connects to). Click the **⧉** beside an IP or domain to copy it.
 
 Toolbar:
 - **Filter by inbound** and **Issues only** to narrow the graph.
@@ -123,9 +125,9 @@ Each scan also pulls **live throughput** per `(node × inbound)` from `/api/syst
 
 ## Security
 
-- The token is sent only to **your** panel (server-side, to avoid browser CORS) and is **never stored on disk** or sent to any third party.
+- The token is sent only to **your** panel (server-side, to avoid browser CORS) and is **never stored on disk** or sent to any third party. The optional **Cookie header** is treated the same way — proxied to your panel only, never logged or persisted server-side.
 - DNS resolution uses the host's system resolver first (A and AAAA). If a name fails, it falls back to DNS-over-HTTPS (`dns.google`, A + AAAA) — only the **hostname** is sent, never the token. Disable with `DOH=0`.
-- "Remember" in the UI stores the URL + token in your browser's `localStorage` only. Untick it on shared machines.
+- "Remember" in the UI stores the URL + token (and Cookie header, if set) in your browser's `localStorage` only. Untick it on shared machines.
 
 ## Env vars
 
@@ -143,7 +145,7 @@ Each scan also pulls **live throughput** per `(node × inbound)` from `/api/syst
 
 ## API
 
-`POST /api/scan` with JSON `{ "panelUrl": "...", "token": "..." }` returns the full topology graph + issues (the same payload the UI renders), so you can script against it too.
+`POST /api/scan` with JSON `{ "panelUrl": "...", "token": "..." }` returns the full topology graph + issues (the same payload the UI renders), so you can script against it too. An optional `"cookieHeader"` field (raw `name=value; …` string or a JSON object) is forwarded as a `Cookie:` header to the panel for proxy/cookie-gated deployments; you may supply `token`, `cookieHeader`, or both (panelUrl plus at least one is required).
 
 ## Run from GitHub Container Registry (no build)
 

@@ -15,7 +15,7 @@ const test = require('node:test');
 const assert = require('node:assert');
 const dns = require('dns');
 
-const { scan, resolveHost, parseBytes } = require('../server.js');
+const { scan, resolveHost, parseBytes, parseCookieHeader } = require('../server.js');
 
 // ---- DNS stub (server.js captured dns.promises by reference) ----
 const A = { 'de.example.com': ['1.2.3.4'], 'a.example.com': ['1.2.3.4'], 'b.example.com': ['5.6.7.8'], 'cache.example.com': ['9.9.9.9'] };
@@ -174,4 +174,56 @@ test('resolveHost caches results within TTL (no repeat DNS lookup)', async () =>
   assert.deepStrictEqual(r1.ips, ['9.9.9.9']);
   assert.deepStrictEqual(r2.ips, ['9.9.9.9']);
   assert.strictEqual((dnsCalls['cache.example.com'] || 0) - before, 1, 'second lookup must be served from cache');
+});
+
+test('parseCookieHeader normalizes raw strings, JSON objects, and empties', () => {
+  assert.strictEqual(parseCookieHeader('a=1; b=2'), 'a=1; b=2');                 // raw passthrough (trimmed)
+  assert.strictEqual(parseCookieHeader('  s=x  '), 's=x');
+  assert.strictEqual(parseCookieHeader('{"sid":"xyz","t":"9"}'), 'sid=xyz; t=9'); // JSON object -> header
+  assert.strictEqual(parseCookieHeader('{bad json'), '{bad json');               // unparseable JSON -> raw
+  assert.strictEqual(parseCookieHeader(''), null);
+  assert.strictEqual(parseCookieHeader('   '), null);
+  assert.strictEqual(parseCookieHeader(null), null);
+});
+
+test('scan() forwards the Cookie header and sets Authorization only when a token is present', async () => {
+  const realFetch = global.fetch;
+  const captured = [];
+  global.fetch = async (url, opts) => {
+    const u = String(url);
+    captured.push({ url: u.replace(/^https?:\/\/[^/]+/, ''), headers: (opts && opts.headers) || {} });
+    const J = (obj) => ({ ok: true, status: 200, text: async () => JSON.stringify(obj) });
+    if (u.endsWith('/api/hosts')) return J(HOSTS);
+    if (u.endsWith('/api/nodes')) return J(NODES);
+    if (u.endsWith('/api/config-profiles')) return J(PROFILES);
+    if (u.endsWith('/api/system/stats')) return J(STATS);
+    if (u.endsWith('/api/system/nodes/metrics')) return J(METRICS);
+    throw new Error('unexpected fetch: ' + u);
+  };
+  try {
+    // token + cookie (JSON form) -> both headers, cookie flattened
+    captured.length = 0;
+    await scan('panel.test', 'tok', { cookieHeader: '{"session":"abc"}' });
+    assert.ok(captured.length > 0);
+    for (const c of captured) {
+      assert.strictEqual(c.headers.Authorization, 'Bearer tok');
+      assert.strictEqual(c.headers.Cookie, 'session=abc');
+    }
+    // cookie-only (empty token) -> Authorization omitted, Cookie present
+    captured.length = 0;
+    await scan('panel.test', '', { cookieHeader: 'a=1; b=2' });
+    for (const c of captured) {
+      assert.strictEqual(c.headers.Authorization, undefined, 'no Authorization header in cookie-only mode');
+      assert.strictEqual(c.headers.Cookie, 'a=1; b=2');
+    }
+    // token-only (no opts) -> Authorization present, no Cookie
+    captured.length = 0;
+    await scan('panel.test', 'tok');
+    for (const c of captured) {
+      assert.strictEqual(c.headers.Authorization, 'Bearer tok');
+      assert.strictEqual(c.headers.Cookie, undefined, 'no Cookie header when none supplied');
+    }
+  } finally {
+    global.fetch = realFetch;
+  }
 });
