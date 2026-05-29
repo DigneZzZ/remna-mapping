@@ -433,6 +433,27 @@ function populateInbounds(){
 }
 function domStatus(d){return d.dead?'dead':(d.foreign.size?'foreign':'ok');}
 function nodeDown(n){return !!(n&&!n.connected&&!n.disabled);}
+// Unified status descriptor for any diagram entity → {key,label,color,dim}.
+// Reuses nodeDown/domStatus and COLORS so every SVG view speaks one status language.
+function entStatus(type,meta){
+  if(type==='node'){
+    if(meta&&meta.disabled)return {key:'disabled',label:'disabled',color:COLORS.dis,dim:true};
+    if(nodeDown(meta))return {key:'down',label:'down',color:COLORS.down};
+    return {key:'up',label:'online',color:COLORS.up};
+  }
+  if(type==='host'){
+    if(meta&&meta.disabled)return {key:'disabled',label:'disabled',color:COLORS.dis,dim:true};
+    return {key:'active',label:'enabled',color:COLORS.host};
+  }
+  if(type==='domain'){const s=domStatus(meta);
+    if(s==='dead')return {key:'dead',label:'dead DNS',color:COLORS.dead};
+    if(s==='foreign')return {key:'foreign',label:'foreign IPs',color:COLORS.foreign};
+    return {key:'ok',label:'ok',color:COLORS.domain};
+  }
+  if(type==='foreign')return {key:'foreign',label:'unregistered IP',color:COLORS.foreign};
+  if(type==='inbound')return {key:'active',label:'inbound',color:COLORS.inbound};
+  return {key:'',label:type||'',color:'#9fb0c8'};
+}
 function domainHasIssue(d){return d.dead||d.foreign.size>0||[...d.matched].some(u=>nodeDown(MODEL.nodeByUuid.get(u)));}
 function matchSearch(txt){return !filters.search||String(txt).toLowerCase().includes(filters.search);}
 function domainPasses(d){
@@ -500,6 +521,9 @@ function makeSvg(vp,w,h){
 function defsGlow(svg){const f=svg.append('defs').append('filter').attr('id','gl').attr('x','-60%').attr('y','-60%').attr('width','220%').attr('height','220%');
   f.append('feGaussianBlur').attr('stdDeviation','3').attr('result','b');const m=f.append('feMerge');m.append('feMergeNode').attr('in','b');m.append('feMergeNode').attr('in','SourceGraphic');}
 function nodeColor(n){return n.disabled?COLORS.dis:n.connected?COLORS.up:COLORS.down;}
+// Compact status sub-legend appended to every SVG view's legend so the color/dim
+// encoding (active / down / disabled-dimmed) is explained. Color dots, no glyph.
+const STATUS_LEGEND=[[COLORS.up,'status: active'],[COLORS.down,'down'],[COLORS.dis,'disabled (dimmed)']];
 function legend(items){const l=document.createElement('div');l.className='legend';
   // items: [color, label, iconType?] — render the entity glyph when an icon type is given, else a color dot.
   l.innerHTML=items.map(([c,t,ic])=>`<div>${ic?icon(ic,c):`<i style="background:${c}"></i>`}${t}</div>`).join('');els.viewport.appendChild(l);}
@@ -564,7 +588,13 @@ function renderTree(){
   const tree=d3.tree().nodeSize([20,210]);
   const dur=350;
   function rOf(d){if(filters.uniform)return d.data.type==='root'?8:7;return d.data.type==='inbound'?7:d.data.type==='node'?5+Math.sqrt((d.data.meta&&d.data.meta.usersOnline)||0)*0.25:d.data.type==='root'?8:5;}
-  function colOf(d){const t=d.data.type;return t==='inbound'?COLORS.inbound:t==='host'?COLORS.host:t==='domain'?(d.data.dead?COLORS.dead:d.data.foreign?COLORS.foreign:COLORS.domain):t==='node'?nodeColor(d.data.meta):t==='foreign'?COLORS.foreign:'#9fb0c8';}
+  // Status descriptor for a tree datum. The tree stores domain dead/foreign as flags
+  // (not a domain model), so build the shape domStatus() expects.
+  function treeStatus(d){const t=d.data.type;
+    if(t==='domain')return entStatus('domain',{dead:d.data.dead,foreign:new Set(d.data.foreign?['x']:[])});
+    return entStatus(t,d.data.meta);}
+  function colOf(d){const t=d.data.type;if(t==='root')return '#9fb0c8';return treeStatus(d).color;}
+  function dimOf(d){return d.data.type==='root'?1:(treeStatus(d).dim?0.45:1);}
   // Map a tree datum to its entity glyph (root → none; down node → 'down'), mirroring entIcon().
   function treeGlyphKey(d){const t=d.data.type;if(t==='root')return null;
     if(t==='node')return nodeDown(d.data.meta)?'down':'node';return t;}
@@ -577,6 +607,7 @@ function renderTree(){
       .transition().duration(dur).attr('d',d3.linkHorizontal().x(d=>d.y).y(d=>d.x));
     const gn=g.selectAll('g.tn').data(nodes,d=>d.data.__id||(d.data.__id=++uid));
     const en=gn.enter().append('g').attr('class','tn').attr('transform',`translate(${src.y0},${src.x0})`).style('cursor','pointer')
+      .attr('opacity',dimOf)
       .on('click',(e,d)=>{e.stopPropagation(); if(d._children||d.children){d.children=d.children?null:d._children;d._children=d.children?null:d._children;update(d);} openDetailFromTree(d);})
       .on('mouseover',(e,d)=>tipTree(e,d)).on('mousemove',moveTip).on('mouseout',hideTip);
     en.append('circle').attr('r',rOf).attr('fill',d=>(filters.uniform&&treeGlyphKey(d))?'transparent':colOf(d)).attr('stroke',d=>d._children?'#fff':((filters.uniform&&treeGlyphKey(d))?'none':'rgba(255,255,255,.5)')).attr('stroke-width',d=>d._children?1.8:.8)
@@ -594,7 +625,7 @@ function renderTree(){
   }
   let uid=0; root.x0=H/2;root.y0=0; update(root);
   setTimeout(()=>fitTo(g,svg,W,H),420);
-  legend([[COLORS.inbound,'inbound','inbound'],[COLORS.host,'host','host'],[COLORS.domain,'domain','domain'],[COLORS.up,'node up','up'],[COLORS.down,'down','down'],[COLORS.foreign,'foreign/dead','foreign']]);
+  legend([[COLORS.inbound,'inbound','inbound'],[COLORS.host,'host','host'],[COLORS.domain,'domain','domain'],[COLORS.up,'node up','up'],[COLORS.down,'down','down'],[COLORS.foreign,'foreign/dead','foreign'],...STATUS_LEGEND]);
   hint('click a node to expand · drag to pan · scroll to zoom');
 }
 function openDetailFromTree(d){const t=d.data.type;
@@ -604,8 +635,9 @@ function openDetailFromTree(d){const t=d.data.type;
   else if(t==='inbound'&&d.data.meta)showInboundDetail(d.data.meta);}
 function tipTree(e,d){const t=d.data.type;
   const tic=t==='node'?entIcon('node',{down:nodeDown(d.data.meta)}):t==='domain'?entIcon('domain',{dead:d.data.dead,foreign:d.data.foreign}):entIcon(t);
-  let h=`<b>${tic}${esc(d.data.full||d.data.name)}</b> <span class="s">${t}</span>`;
-  if(t==='node'&&d.data.meta){const n=d.data.meta;h+=`<br><span class="s">${(n.ips||[]).join(', ')}</span><br>${n.connected?'online':'down'} · ${fmt(n.usersOnline)} users${(n.up||n.down)?` · ↑${fmtBytes(n.up)} ↓${fmtBytes(n.down)}`:''}`;}
+  const st=t==='root'?null:(t==='domain'?entStatus('domain',{dead:d.data.dead,foreign:new Set(d.data.foreign?['x']:[])}):entStatus(t,d.data.meta));
+  let h=`<b>${tic}${esc(d.data.full||d.data.name)}</b> <span class="s">${t}${st&&st.label?' · '+st.label:''}</span>`;
+  if(t==='node'&&d.data.meta){const n=d.data.meta;h+=`<br><span class="s">${(n.ips||[]).join(', ')}</span><br>${n.disabled?'disabled':n.connected?'online':'down'} · ${fmt(n.usersOnline)} users${(n.up||n.down)?` · ↑${fmtBytes(n.up)} ↓${fmtBytes(n.down)}`:''}`;}
   if(t==='inbound'&&d.data.meta)h+=`<br><span class="s">hosts ${d.data.meta.hostCount} · nodes ${d.data.meta.nodeCount}</span>`;
   showTipHtml(e,h);}
 
@@ -620,7 +652,7 @@ function renderTiers(){
   DATA.hosts.forEach(h=>{ if(h.addresses.some(a=>{const k=a.kind==='domain'?a.domain:(a.ips[0]&&a.ips[0].ip);return k&&doms.find(d=>d.domain===k);}))hostSet.set(h.uuid,h);});
   const cols=[
     {key:'inb',x:W*0.10,items:DATA.inbounds.filter(i=>inbUuids.has(i.uuid)).map(i=>({id:'i:'+i.uuid,label:i.tag,color:COLORS.inbound,meta:i,type:'inbound'}))},
-    {key:'host',x:W*0.37,items:[...hostSet.values()].map(h=>({id:'h:'+h.uuid,label:h.remark,color:COLORS.host,meta:h,type:'host'}))},
+    {key:'host',x:W*0.37,items:[...hostSet.values()].map(h=>({id:'h:'+h.uuid,label:h.remark,color:entStatus('host',h).color,meta:h,type:'host'}))},
     {key:'dom',x:W*0.64,items:doms.map(d=>({id:'d:'+d.domain,label:short(d.domain),color:domStatus(d)==='dead'?COLORS.dead:domStatus(d)==='foreign'?COLORS.foreign:COLORS.domain,meta:d,type:'domain'}))},
     {key:'node',x:W*0.90,items:[...nodeSet.values()].filter(Boolean).map(n=>({id:'n:'+n.uuid,label:nodeLabel(n),color:nodeColor(n),meta:n,type:'node',users:n.usersOnline}))
       .concat([...foreignSet.keys()].map(ip=>({id:'f:'+ip,label:ip,color:COLORS.foreign,type:'foreign'})))},
@@ -637,8 +669,8 @@ function renderTiers(){
     .attr('stroke',d=>d[1].type==='foreign'?'rgba(240,136,62,.4)':'rgba(120,150,200,.18)').attr('stroke-width',1)
     .attr('d',d=>`M${d[0].x},${d[0].y}C${(d[0].x+d[1].x)/2},${d[0].y} ${(d[0].x+d[1].x)/2},${d[1].y} ${d[1].x},${d[1].y}`);
   const all=cols.flatMap(c=>c.items);
-  const gn=g.append('g').selectAll('g').data(all).join('g').attr('transform',d=>`translate(${d.x},${d.y})`).style('cursor','pointer')
-    .on('click',(e,d)=>{e.stopPropagation();tierDetail(d);}).on('mouseover',(e,d)=>showTipHtml(e,`<b>${entIcon(d.type,{down:d.type==='node'&&nodeDown(d.meta),dead:d.type==='domain'&&domStatus(d.meta)==='dead',foreign:d.type==='domain'&&domStatus(d.meta)==='foreign'})}${esc(d.meta?(d.meta.name||d.meta.remark||d.meta.tag||d.label):d.label)}</b> <span class="s">${d.type}</span>${d.type==='node'?`<br><span class="s">${(d.meta.ips||[]).join(', ')} · ${fmt(d.meta.usersOnline)} users</span>`:''}`)).on('mousemove',moveTip).on('mouseout',hideTip);
+  const gn=g.append('g').selectAll('g').data(all).join('g').attr('transform',d=>`translate(${d.x},${d.y})`).attr('opacity',d=>entStatus(d.type,d.meta).dim?0.45:1).style('cursor','pointer')
+    .on('click',(e,d)=>{e.stopPropagation();tierDetail(d);}).on('mouseover',(e,d)=>{const st=entStatus(d.type,d.meta);showTipHtml(e,`<b>${entIcon(d.type,{down:d.type==='node'&&nodeDown(d.meta),dead:d.type==='domain'&&domStatus(d.meta)==='dead',foreign:d.type==='domain'&&domStatus(d.meta)==='foreign'})}${esc(d.meta?(d.meta.name||d.meta.remark||d.meta.tag||d.label):d.label)}</b> <span class="s">${d.type}${st.label?' · '+st.label:''}</span>${d.type==='node'?`<br><span class="s">${(d.meta.ips||[]).join(', ')} · ${fmt(d.meta.usersOnline)} users</span>`:''}`);}).on('mousemove',moveTip).on('mouseout',hideTip);
   gn.append('circle').attr('r',d=>filters.uniform?6:(d.type==='node'?Math.max(3,4+Math.sqrt(d.users||0)*0.2):d.type==='inbound'?7:5)).attr('fill',d=>filters.uniform?'transparent':d.color)
     .attr('stroke',filters.uniform?'none':'rgba(255,255,255,.5)').attr('stroke-width',.7).attr('filter',d=>(!filters.uniform&&d.type==='inbound')?'url(#gl)':null)
     .attr('class',d=>d.type==='foreign'||(d.type==='domain'&&domStatus(d.meta)!=='ok')?'pulse-s':null);
@@ -651,7 +683,7 @@ function renderTiers(){
     .text(d=>d.label&&d.label.length>22?d.label.slice(0,21)+'…':d.label);
   cols.forEach(c=>g.append('text').attr('x',c.x).attr('y',26).attr('text-anchor','middle').attr('font-size',11).attr('fill',COLORS.inbound==c.items[0]?.color?'#cdbcff':'var(--mut)').attr('fill','#7e8aa5').text({inb:'INBOUNDS',host:'HOSTS',dom:'DOMAINS',node:'NODES / IPs'}[c.key]+` (${c.items.length})`));
   setTimeout(()=>fitTo(g,svg,W,H),60);
-  legend([[COLORS.inbound,'inbound','inbound'],[COLORS.host,'host','host'],[COLORS.domain,'domain','domain'],[COLORS.up,'node up','up'],[COLORS.foreign,'foreign IP','foreign']]);
+  legend([[COLORS.inbound,'inbound','inbound'],[COLORS.host,'host','host'],[COLORS.domain,'domain','domain'],[COLORS.up,'node up','up'],[COLORS.foreign,'foreign IP','foreign'],...STATUS_LEGEND]);
   hint('columns: inbound → host → domain → node · drag/scroll to navigate');
 }
 function tierDetail(d){if(d.type==='node')showNodeDetail(d.meta);else if(d.type==='domain')showDomainDetailByName(d.meta.domain);else if(d.type==='host')showHostDetail(d.meta);else if(d.type==='inbound')showInboundDetail(d.meta);}
@@ -682,9 +714,9 @@ function renderSankey(){
   g.append('g').attr('fill','none').selectAll('path').data(graph.links).join('path').attr('d',d3.sankeyLinkHorizontal())
     .attr('stroke',d=>d.target.type==='foreign'?'rgba(240,136,62,.35)':'rgba(120,150,200,.18)')
     .attr('stroke-width',d=>Math.max(1,d.width)).on('mouseover',(e,d)=>showTipHtml(e,`<b>${esc(d.source.name)} → ${esc(d.target.name)}</b><br><span class="s">${fmt(d.value)} users</span>`)).on('mousemove',moveTip).on('mouseout',hideTip);
-  const gn=g.append('g').selectAll('g').data(graph.nodes).join('g').style('cursor','pointer')
+  const gn=g.append('g').selectAll('g').data(graph.nodes).join('g').attr('opacity',d=>entStatus(d.type,d.meta).dim?0.45:1).style('cursor','pointer')
     .on('click',(e,d)=>{e.stopPropagation();if(d.type==='node')showNodeDetail(d.meta);else if(d.type==='domain')showDomainDetailByName(d.meta.domain);else if(d.type==='inbound')showInboundDetail(d.meta);})
-    .on('mouseover',(e,d)=>showTipHtml(e,`<b>${entIcon(d.type,{down:d.type==='node'&&nodeDown(d.meta),foreign:d.type==='domain'&&d.meta&&d.meta.foreign&&d.meta.foreign.size>0})}${esc(d.name)}</b> <span class="s">${d.type}</span>`)).on('mousemove',moveTip).on('mouseout',hideTip);
+    .on('mouseover',(e,d)=>{const st=entStatus(d.type,d.meta);showTipHtml(e,`<b>${entIcon(d.type,{down:d.type==='node'&&nodeDown(d.meta),foreign:d.type==='domain'&&d.meta&&d.meta.foreign&&d.meta.foreign.size>0})}${esc(d.name)}</b> <span class="s">${d.type}${st.label?' · '+st.label:''}</span>`);}).on('mousemove',moveTip).on('mouseout',hideTip);
   gn.append('rect').attr('x',d=>d.x0).attr('y',d=>d.y0).attr('height',d=>Math.max(1,d.y1-d.y0)).attr('width',d=>d.x1-d.x0).attr('fill',col).attr('rx',2);
   gn.append('text').attr('x',d=>d.x0<W/2?d.x1+5:d.x0-5).attr('y',d=>(d.y0+d.y1)/2).attr('dy',3).attr('text-anchor',d=>d.x0<W/2?'start':'end')
     .attr('font-size',10.5).attr('fill','rgba(231,236,245,.82)').attr('paint-order','stroke').attr('stroke','rgba(7,10,20,.82)').attr('stroke-width',2.2)
@@ -695,7 +727,7 @@ function renderSankey(){
       d=>d.x0<W/2?d.x1+5+SZ/2:d.x0-5-SZ/2,d=>(d.y0+d.y1)/2);
     gn.selectAll('text').attr('x',d=>d.x0<W/2?d.x1+5+SZ+3:d.x0-5-SZ-3);}
   setTimeout(()=>fitTo(g,svg,W,H),60);
-  legend([[COLORS.inbound,'inbound','inbound'],[COLORS.domain,'domain','domain'],[COLORS.up,'node (width = users)','up'],[COLORS.foreign,'foreign IP','foreign']]);
+  legend([[COLORS.inbound,'inbound','inbound'],[COLORS.domain,'domain','domain'],[COLORS.up,'node (width = users)','up'],[COLORS.foreign,'foreign IP','foreign'],...STATUS_LEGEND]);
   hint('flow width = users online · drag/scroll to navigate');
 }
 
@@ -758,15 +790,19 @@ function renderForce(){
   DATA.inbounds.forEach(i=>{if(filters.inbound!=='all'&&i.uuid!==filters.inbound)return;add({id:'i:'+i.uuid,type:'inbound',label:i.tag,meta:i});});
   doms.forEach(d=>{add({id:'d:'+d.domain,type:'domain',label:short(d.domain),full:d.domain,meta:d,status:domStatus(d)});
     d.inboundUuids.forEach(u=>{if(by['i:'+u])links.push({source:'i:'+u,target:'d:'+d.domain});});
-    d.matched.forEach(u=>{const n=MODEL.nodeByUuid.get(u);if(!n)return;add({id:'n:'+u,type:'node',label:nodeLabel(n),meta:n});links.push({source:'d:'+d.domain,target:'n:'+u});});
+    d.matched.forEach(u=>{const n=MODEL.nodeByUuid.get(u);if(!n)return;add({id:'n:'+u,type:'node',label:nodeLabel(n),meta:n});if(!filters.overlay)links.push({source:'d:'+d.domain,target:'n:'+u});});
     d.foreign.forEach(ip=>{add({id:'f:'+ip,type:'foreign',label:ip});links.push({source:'d:'+d.domain,target:'f:'+ip});});});
+  // Overlay: route node links through the inbound hub (inbound -> serving node) instead of
+  // domain -> every node, which turned each cluster into an all-to-all mesh. Cluster becomes a star.
+  if(filters.overlay){const seen=new Set();
+    nodesA.forEach(o=>{if(o.type!=='node')return;((o.meta&&o.meta.serves)||[]).forEach(u=>{const id='i:'+u;if(by[id]){const k=id+'>'+o.id;if(!seen.has(k)){seen.add(k);links.push({source:id,target:o.id});}}});});}
   const rOf=d=>filters.uniform?7:(d.type==='inbound'?11:d.type==='node'?5+Math.sqrt((d.meta&&d.meta.usersOnline)||0)*0.32:d.type==='domain'?7:5);
   const colOf=d=>d.type==='inbound'?COLORS.inbound:d.type==='domain'?(d.status==='dead'?COLORS.dead:d.status==='foreign'?COLORS.foreign:COLORS.domain):d.type==='node'?nodeColor(d.meta):COLORS.foreign;
   const link=g.append('g').selectAll('line').data(links).join('line').attr('stroke','rgba(130,150,200,.2)').attr('stroke-width',1);
-  const gn=g.append('g').selectAll('g').data(nodesA).join('g').style('cursor','pointer')
+  const gn=g.append('g').selectAll('g').data(nodesA).join('g').attr('opacity',d=>entStatus(d.type,d.meta).dim?0.45:1).style('cursor','pointer')
     .call(d3.drag().on('start',(e,d)=>{if(!e.active)sim.alphaTarget(.3).restart();d.fx=d.x;d.fy=d.y;}).on('drag',(e,d)=>{d.fx=e.x;d.fy=e.y;}).on('end',(e,d)=>{if(!e.active)sim.alphaTarget(0);d.fx=null;d.fy=null;}))
     .on('click',(e,d)=>{e.stopPropagation();if(d.type==='node')showNodeDetail(d.meta);else if(d.type==='domain')showDomainDetailByName(d.full);else if(d.type==='inbound')showInboundDetail(d.meta);})
-    .on('mouseover',(e,d)=>showTipHtml(e,`<b>${entIcon(d.type,{down:d.type==='node'&&nodeDown(d.meta),dead:d.status==='dead',foreign:d.status==='foreign'})}${esc(d.full||d.label)}</b> <span class="s">${d.type}</span>${d.type==='node'?`<br><span class="s">${(d.meta.ips||[]).join(', ')} · ${fmt(d.meta.usersOnline)} users</span>`:''}`)).on('mousemove',moveTip).on('mouseout',hideTip);
+    .on('mouseover',(e,d)=>{const st=entStatus(d.type,d.meta);showTipHtml(e,`<b>${entIcon(d.type,{down:d.type==='node'&&nodeDown(d.meta),dead:d.status==='dead',foreign:d.status==='foreign'})}${esc(d.full||d.label)}</b> <span class="s">${d.type}${st.label?' · '+st.label:''}</span>${d.type==='node'?`<br><span class="s">${(d.meta.ips||[]).join(', ')} · ${fmt(d.meta.usersOnline)} users</span>`:''}`);}).on('mousemove',moveTip).on('mouseout',hideTip);
   gn.append('circle').attr('r',rOf).attr('fill',d=>filters.uniform?'transparent':colOf(d)).attr('stroke',filters.uniform?'none':'rgba(255,255,255,.55)').attr('stroke-width',.8)
     .attr('filter',d=>(!filters.uniform&&d.type==='inbound')?'url(#gl)':null).attr('class',d=>d.type==='foreign'||(d.type==='domain'&&d.status!=='ok')?'pulse-s':null);
   // Type glyph on each force node; scale with radius, reuse the same >140 threshold as labels.
@@ -783,7 +819,7 @@ function renderForce(){
     .force('x',d3.forceX(d=>{const u=d.type==='inbound'?d.meta.uuid:null;const k=u?ibIndex.get(u):2;return (W*0.12)+((k%5)/4)*(W*0.76);}).strength(.05))
     .force('y',d3.forceY(H/2).strength(.05)).force('collide',d3.forceCollide().radius(d=>rOf(d)+7)).force('center',d3.forceCenter(W/2,H/2))
     .on('tick',()=>{link.attr('x1',d=>d.source.x).attr('y1',d=>d.source.y).attr('x2',d=>d.target.x).attr('y2',d=>d.target.y);gn.attr('transform',d=>`translate(${d.x},${d.y})`);});
-  legend([[COLORS.inbound,'inbound','inbound'],[COLORS.domain,'domain','domain'],[COLORS.up,'node up','up'],[COLORS.down,'down','down'],[COLORS.foreign,'foreign/dead','foreign']]);
+  legend([[COLORS.inbound,'inbound','inbound'],[COLORS.domain,'domain','domain'],[COLORS.up,'node up','up'],[COLORS.down,'down','down'],[COLORS.foreign,'foreign/dead','foreign'],...STATUS_LEGEND]);
   hint('drag nodes · scroll to zoom — Tree/Tiers/Matrix are clearer at scale');
 }
 
