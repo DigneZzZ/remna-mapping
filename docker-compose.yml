@@ -1,0 +1,11 @@
+services:
+  vpn-topology-mapper:
+    build: .
+    container_name: vpn-topology-mapper
+    ports:
+      - "8088:8088"          # change left side to expose on a different host port
+    environment:
+      - PORT=8088
+      - DOH=1                # DNS-over-HTTPS fallback (dns.google). Set 0 to use system DNS only.
+      - DNS_TIMEOUT_MS=4000  # per-name DNS timeout before fallback
+    restart: unless-stopped

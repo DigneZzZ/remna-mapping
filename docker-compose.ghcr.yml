@@ -1,0 +1,15 @@
+# Pull the prebuilt image from GitHub Container Registry (no local build).
+#   docker compose -f docker-compose.ghcr.yml up -d
+# If your GitHub user/org is not "dignezzz", change the image owner below.
+services:
+  remna-mapping:
+    image: ghcr.io/dignezzz/remna-mapping:latest
+    container_name: remna-mapping
+    ports:
+      - "8088:8088"            # host:container — change left side to expose elsewhere
+    environment:
+      - PORT=8088
+      - DOH=1                  # DNS-over-HTTPS fallback; set 0 for system DNS only
+      - DNS_TIMEOUT_MS=4000
+    restart: unless-stopped
+    pull_policy: always        # always fetch the newest :latest on `up`
