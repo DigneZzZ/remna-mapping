@@ -18,6 +18,10 @@ const fs = require('fs');
 const path = require('path');
 
 const PORT = parseInt(process.env.PORT || '8088', 10);
+// Bind to loopback by default so the proxy never exposes itself on the network.
+// Set HOST=0.0.0.0 to listen on all interfaces (the Docker image does this; the
+// container's own port mapping decides who can reach it).
+const HOST = process.env.HOST || '127.0.0.1';
 const DOH = process.env.DOH !== '0';            // DoH fallback on by default
 const DNS_TIMEOUT_MS = parseInt(process.env.DNS_TIMEOUT_MS || '4000', 10);
 // Scale knobs (matter when many users scan at once):
@@ -466,6 +470,7 @@ const server = http.createServer((req, res) => {
 });
 
 if (require.main === module) {
-  server.listen(PORT, () => console.log(`VPN Topology Mapper running on http://0.0.0.0:${PORT}  (DoH fallback: ${DOH ? 'on' : 'off'})`));
+  const shown = HOST === '0.0.0.0' || HOST === '::' ? 'localhost' : HOST;   // 0.0.0.0 isn't a usable URL host
+  server.listen(PORT, HOST, () => console.log(`VPN Topology Mapper running on http://${shown}:${PORT}  (bind: ${HOST}, DoH fallback: ${DOH ? 'on' : 'off'})`));
 }
 module.exports = { scan, resolveHost, parseBytes, parseCookieHeader };

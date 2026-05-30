@@ -24,6 +24,8 @@ docker compose up --build -d
 # open http://localhost:8088
 ```
 
+> **Local-only by default.** The container's port is published on `127.0.0.1` only and the Node process binds `127.0.0.1` (`HOST`) — the backend never exposes itself on the network. To reach it remotely, drop the `127.0.0.1` prefix in the compose `ports:` mapping (or set `HOST=0.0.0.0` for bare Node), but front it with your own VPN/reverse-proxy + auth first — it has **no built-in auth**.
+
 Then in the UI:
 1. Panel URL — e.g. `panel.me.pro` (scheme optional).
 2. API token — a Remnawave API-role token (Bearer).
@@ -37,14 +39,15 @@ To change the exposed port, edit the `ports:` mapping in `docker-compose.yml`.
 
 ```bash
 docker build -t vpn-topology-mapper .
-docker run -d -p 8088:8088 --name vtm vpn-topology-mapper
+docker run -d -p 127.0.0.1:8088:8088 --name vtm vpn-topology-mapper   # local-only; drop 127.0.0.1: to expose
 ```
 
 ### Without Docker (Node ≥ 18)
 
 ```bash
-node server.js          # http://localhost:8088
+node server.js          # http://localhost:8088  (binds 127.0.0.1 — local-only)
 PORT=9000 node server.js
+HOST=0.0.0.0 node server.js   # listen on all interfaces (no built-in auth — front with a proxy)
 node --test             # run the test suite (zero-dep, built-in node:test)
 ```
 
@@ -125,16 +128,18 @@ Each scan also pulls **live throughput** per `(node × inbound)` from `/api/syst
 
 ## Security
 
-- The token is sent only to **your** panel (server-side, to avoid browser CORS) and is **never stored on disk** or sent to any third party. The optional **Cookie header** is treated the same way — proxied to your panel only, never logged or persisted server-side.
-- DNS resolution uses the host's system resolver first (A and AAAA). If a name fails, it falls back to DNS-over-HTTPS (`dns.google`, A + AAAA) — only the **hostname** is sent, never the token. Disable with `DOH=0`.
+- **Local-only by default** — the backend binds to `127.0.0.1` (`HOST`) and the Docker port maps to `127.0.0.1`, so it never exposes itself on the network. Opt in to exposure explicitly (see [Quick start](#quick-start-docker)); there is no built-in auth.
+- The token is sent only to **your** panel (server-side, to avoid browser CORS) and is **never stored on disk** or sent to any third party. The optional **Cookie header** is treated the same way — proxied to your panel only, never logged or persisted server-side. Secrets live in memory only for the duration of a request.
+- DNS resolution uses the host's system resolver first (A and AAAA) — no third party involved. If a name fails, it falls back to DNS-over-HTTPS (`dns.google`, A + AAAA) — only the **hostname** is sent, never the token. Set `DOH=0` for zero outbound DNS to third parties.
 - "Remember" in the UI stores the URL + token (and Cookie header, if set) in your browser's `localStorage` only. Untick it on shared machines.
 
 ## Env vars
 
 | Var | Default | Purpose |
 |---|---|---|
+| `HOST` | `127.0.0.1` | Bind address — loopback-only by default so the proxy never exposes itself. `0.0.0.0` to listen on all interfaces. |
 | `PORT` | `8088` | HTTP listen port |
-| `DOH` | `1` | DNS-over-HTTPS fallback on/off |
+| `DOH` | `1` | DNS-over-HTTPS fallback on/off (`0` = system resolver only, no third-party DNS) |
 | `DNS_TIMEOUT_MS` | `4000` | per-name DNS timeout before fallback |
 | `DNS_CONCURRENCY` | `20` | max in-flight DNS lookups per scan (bounded fan-out) |
 | `RESOLVE_TTL_MS` | `30000` | DNS result cache TTL in ms (`0` disables) |
